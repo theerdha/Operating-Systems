@@ -17,7 +17,7 @@ int main(){
     int status;
     stringstream stream;
     // Prompt on terminal
-    cout <<"G76shell$ ";
+    cout <<"G38shell$ ";
 
     // Read input command from terminal
     getline(cin,command);
@@ -42,7 +42,10 @@ int main(){
         args[i] = new char[comm[i].length()+1];
         comm[i].copy(args[i],comm[i].length());
       }
-      status = execvp(comm[0].c_str(),args);
+      if(comm[0].compare("cd") == 0)
+        status = chdir(args[1]);
+      else
+        status = execvp(args[0],args);
       return 0;
     }
     else{
