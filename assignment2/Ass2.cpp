@@ -67,7 +67,7 @@ int main(){
                 comm.push_back(piece);
 				for(count = 0; count < comm.size(); count++)
 				{
-					if (comm[count].compare(">") == 0)break;
+					if (comm[count].compare(">") == 0 || comm[count].compare(">>") == 0 )break;
 				}
 				char** args = new char*[count];
 				for(int i = 0; i < count; i++)
@@ -78,11 +78,18 @@ int main(){
 				}
 				args[count] = NULL;
 
-				 close(1); 
-				 int file_desc = open(comm[count + 1].c_str(), O_WRONLY | O_APPEND |  O_CREAT , S_IRWXU);
-				 dup(file_desc);
-				 execvp(args[0],args);
-				_exit(0);
+				x = fork();
+                if(x == 0){
+                    close(1); 
+					int file_desc;
+					if (comm[count].compare(">") == 0)file_desc = open(comm[count + 1].c_str(), O_WRONLY |  O_CREAT , S_IRWXU);
+					else file_desc = open(comm[count + 1].c_str(), O_WRONLY | O_APPEND |  O_CREAT , S_IRWXU);
+					dup(file_desc);
+					execvp(args[0],args);
+					_exit(0);
+                }
+
+				 
         }
         if (type.compare("B") == 0 or type.compare("A") == 0 or type.compare("D") == 0 ){
             waitpid(-1,&status,0);
