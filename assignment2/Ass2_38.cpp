@@ -60,36 +60,37 @@ int main(){
                 }
             }
             else{
-                // Additional parsing for internal commands for usage of ~ 
+            // Additional parsing for internal commands for usage of ~ 
                 char* pwd_ = get_current_dir_name();
-                
+                const char* home = "HOME";
+                char* home_dir = new char[1000];
+                char* home_env = getenv(home);
+                strcpy(home_dir,home_env);
+                    
                
                 // Handling usage of ~ or no path specified
-                if(args[1] == NULL or args[1][0] == '~'){
-                    const char* home = "HOME";
-                    char* home_dir = new char[1000];
-                    char* home_env = getenv(home);
-                    strcpy(home_dir,home_env);
-                    if(args[1][0] == '~')
-                        args[1] = args[1]+1;
-                    else{
-                        args[1] = new char[1];
-                        args[1][0] = '\0';
-                    }
+                if(args[1] == NULL){
+                    args[1] = new char[1000];
+                    args[1][0] = '\0';
                     strcat(home_dir,args[1]);
                     strcpy(args[1],home_dir);
+                   // printf("%s\n",args[1]);
+                }
+                else if(args[1][0] == '~'){
+                    args[1] = args[1]+1;
+                    strcat(home_dir,args[1]);
+                    strcpy(args[1],home_dir);
+                   // printf("%s\n",args[1]);
                 }
                 // Handling local directory
-                else if(args[1][0]!='/'){
-                    char* pwd = new char[sizeof(pwd_)];
+                else if(args[1][0] != '/'){
+                    char* pwd = new char[1000];
                     strcpy(pwd,pwd_);
-                    args[1] = new char[1000];
-                    comm[1].copy(args[1],comm[1].length());
-                    args[1][comm[1].length()] = '\0';
                     char slash = '/';
                     strcat(pwd,&slash);
                     strcat(pwd,args[1]);
                     strcpy(args[1],pwd);
+                   // printf("%s\n",args[1]);
                 }
                 
 
@@ -109,7 +110,7 @@ int main(){
                 else if(comm[0].compare("rmdir") == 0){
                     rmdir(args[1]);
                 }
-                free(pwd_);
+                //free(pwd_);
             }
         }
         else if(type.compare("C") == 0){
@@ -124,6 +125,27 @@ int main(){
                     break;
                 case ENOEXEC:
                     cout << "Command failed with the error ENOEXEC.\n";
+                    break;
+                case EFAULT:
+                    cout << "Command failed with the error EFAULT.\n";
+                    break;
+                case EIO:
+                    cout << "Command failed with the error EIO.\n";
+                    break;
+                case ELOOP:
+                    cout << "Command failed with the error ELOOP.\n";
+                    break;
+                case ENAMETOOLONG:
+                    cout << "Command failed with the error ENAMETOOLONG.\n";
+                    break;
+                case ENOENT:
+                    cout << "Command failed with the error ENOENT.\n";
+                    break;
+                case ENOMEM:
+                    cout << "Command failed with the error ENOMEM.\n";
+                    break;
+                case ENOTDIR:
+                    cout << "Command failed with the error ENOTDIR.\n";
                     break;
                 default:
                     cout << "Unexpected error.\n";
