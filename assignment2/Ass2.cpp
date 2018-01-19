@@ -77,12 +77,14 @@ int main(){
                 		filename = temp.substr(i+1 , temp.length() - i - 1);
                 		flag = 0;
                 		num = 1;
+                		break;
                 	}
                 	else if((temp[i] == '>' && temp[i+1] == '>') && temp[i+2] != ' ' )
                 	{
                 		filename = temp.substr(i+2 , temp.length() - i - 2);
                 		flag = 0;
                 		num = 2;
+                		break;
                 	}
                 }
 
@@ -158,6 +160,7 @@ int main(){
                 	{
                 		filename = temp.substr(i+1 , temp.length() - i - 1);
                 		flag = 0;
+                		break;
                 	}
                 }
 
@@ -212,6 +215,52 @@ int main(){
 					_exit(0);
                 }				 
         }
+
+       /* else if(type.compare("F") == 0)
+        {
+        	string temp = stream.str();
+        	vector <string> command;
+        	int first = 0;
+
+            for(int i = 0; i < temp.length() - 1; i++)
+            {
+            	if(temp[i] == '|')
+            	{
+            		command.push_back(temp.substr( first , i - first ));
+            		first = i + 1;
+            	}
+            }
+
+            for(int j= 0; j < command.size(); j++)
+            {
+            	stringstream stream;
+            	while(stream.str(command[j]) >> piece)
+                comm.push_back(piece);
+
+	            char** args = new char*[comm.size()+1];
+	            for(int i = 0; i < comm.size(); i++)
+	            {
+	                args[i] = new char[comm[i].length()+1];
+	                comm[i].copy(args[i],comm[i].length());
+	                args[i][comm[i].length()] = '\0';
+	            }
+	            args[comm.size()] = NULL;
+
+	            X = fork();
+
+	            if(X == 0)
+	            {
+	            	
+	            }
+
+	            else
+	            {
+	            	continue;
+	            }
+            }
+
+        }*/
+
         if (type.compare("B") == 0 or type.compare("A") == 0 or type.compare("D") == 0 or type.compare("C") == 0 ){
             waitpid(-1,&status,0);
         }
