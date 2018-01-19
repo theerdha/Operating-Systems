@@ -15,8 +15,8 @@ using namespace std;
 
 int main(){
 	while(1){
-		vector<string> comm;
-		string command,piece,type;
+		vector<vector<string> > comm(2);
+		string command[2],piece,type;
 		pid_t x;
 		int status = 0;
 		stringstream stream;
@@ -33,91 +33,149 @@ int main(){
         cout <<"G38shell$ ";
 
 		// Read input command from terminal
-		getline(cin,command);
-		stream.str(command);
+		getline(cin,command[0]);
+		
 
-        if(type.compare("B") == 0 or type.compare("E") == 0 or type.compare("A") == 0){
-		    // Split the input command
-            bool printhelp_ = false;
+        char** args[2];
+        bool printhelp = false;
+        
+
+        ////////////// INPUT PARSING ///////////////////
+        //
+        //
+        // Pre parsing for filedesciptor redirecting and pipe
+        if(type.compare("C") == 0 or type.compare("D") == 0){
+        
+        }
+        else if(type.compare("F") == 0){
+            for(int i = 0; i < command[0].length(); i++){
+                if(command[0][i] == '|'){
+                   
+                    for(int j = i+1; j < command[0].length(); i++){
+                        if(command[0][j] != ' '){
+                            command[1] = command[0].substr(j,command[0].length() - j);
+                            break;
+                        }
+                    }
+
+                    for(int j = i-1; i >= 0; j--){
+                        if(command[0][j] != ' '){
+                            command[0] = command[0].substr(0,j+1);
+                            break;
+                        }
+                    }
+                    
+                    break;
+                }
+            }
+        }
+
+
+        // command parsing 
+		int loop_count = 1;
+        if(type.compare("F") == 0)
+            loop_count = 2;
+        for(int id = 0; id < loop_count; id++){
+            stream.str(command[id]);
+            // Split the input command
+    
             while(stream >> piece)
-                comm.push_back(piece);
+                comm[id].push_back(piece);
 
             // Generic parsing and conversion into char*
-            char** args = new char*[comm.size()+1];
-            for(int i = 0; i < comm.size(); i++){
-                args[i] = new char[comm[i].length()+1];
-                comm[i].copy(args[i],comm[i].length());
-                args[i][comm[i].length()] = '\0';
+            args[id] = new char*[comm[id].size()+1];
+            for(int i = 0; i < comm[id].size(); i++){
+                args[id][i] = new char[comm[id][i].length()+1];
+                comm[id][i].copy(args[id][i],comm[id][i].length());
+                args[id][i][comm[id][i].length()] = '\0';
             }
-            args[comm.size()] = NULL;
-            
-            // External commands are handled here
-            if(type.compare("B") == 0 or type.compare("E") == 0){
-                x = fork();
-                if(x == 0){
-                    status = execvp(args[0],args);
-                    _exit(0);
-                }
-            }
-            else{
-            // Additional parsing for internal commands for usage of ~ 
-                char* pwd_ = get_current_dir_name();
-                const char* home = "HOME";
-                char* home_dir = new char[1000];
-                char* home_env = getenv(home);
-                strcpy(home_dir,home_env);
-                    
-               
-                // Handling usage of ~ or no path specified
-                if(args[1] == NULL){
-                    args[1] = new char[1000];
-                    args[1][0] = '\0';
-                    strcat(home_dir,args[1]);
-                    strcpy(args[1],home_dir);
-                   // printf("%s\n",args[1]);
-                }
-                else if(args[1][0] == '~'){
-                    args[1] = args[1]+1;
-                    strcat(home_dir,args[1]);
-                    strcpy(args[1],home_dir);
-                   // printf("%s\n",args[1]);
-                }
-                // Handling local directory
-                else if(args[1][0] != '/'){
-                    char* pwd = new char[1000];
-                    strcpy(pwd,pwd_);
-                    char slash = '/';
-                    strcat(pwd,&slash);
-                    strcat(pwd,args[1]);
-                    strcpy(args[1],pwd);
-                   // printf("%s\n",args[1]);
-                }
+            args[id][comm[id].size()] = NULL;
+        }
+      
+
+        // Additional parsing for handling file locations for internal commands
+        if (type.compare("A") == 0){
+            // Get required locations including absolute location to home and present working directory
+            char* pwd_ = get_current_dir_name();
+            const char* home = "HOME";
+            char* home_dir = new char[1000];
+            char* home_env = getenv(home);
+            strcpy(home_dir,home_env);
                 
+            // Handling usage if no path specified
+            if(args[0][1] == NULL){
+                args[0][1] = new char[1000];
+                args[0][1][0] = '\0';
+                strcat(home_dir,args[0][1]);
+                strcpy(args[0][1],home_dir);
+               // printf("%s\n",args[0][1]);
+            }
+            // Handling '~' if path begins with it
+            else if(args[0][1][0] == '~'){
+                args[0][1] = args[0][1]+1;
+                strcat(home_dir,args[0][1]);
+                strcpy(args[0][1],home_dir);
+               // printf("%s\n",args[0][1]);
+            }
+            // Handling local directory
+            else if(args[0][1][0] != '/'){
+                char* pwd = new char[1000];
+                strcpy(pwd,pwd_);
+                char slash = '/';
+                strcat(pwd,&slash);
+                strcat(pwd,args[0][1]);
+                strcpy(args[0][1],pwd);
+               // printf("%s\n",args[0][1]);
+            }
+        }    
 
-                // chdir case
-                if(comm[0].compare("chdir") == 0 or comm[0].compare("cd") == 0){
-                    if(comm.size() <=  2)    
-                       status = chdir(args[1]);
-                    else
-                        cout << "invalid no of arguments passed.\nCorrect usage '$chdir path'.\n";
-                }
+        ////////////// COMMAND EXECUTION //////////////// 
+        //
+        //
+        // Internal Commands
+        if(type.compare("A") == 0){
+            // chdir case
+            if(comm[0][0].compare("chdir") == 0 or comm[0][0].compare("cd") == 0){
+                if(comm[0].size() <=  2)    
+                   status = chdir(args[0][1]);
+                else
+                    cout << "invalid no of arguments passed.\nCorrect usage '$chdir path'.\n";
+            }
 
-                // mkdir case
-                else if(comm[0].compare("mkdir") == 0 ){
-                    mkdir(args[1],700);
-                }
-                // rmdir case
-                else if(comm[0].compare("rmdir") == 0){
-                    rmdir(args[1]);
-                }
-                //free(pwd_);
+            // mkdir case
+            else if(comm[0][0].compare("mkdir") == 0 ){
+                mkdir(args[0][1],700);
+            }
+            // rmdir case
+            else if(comm[0][0].compare("rmdir") == 0){
+                rmdir(args[0][1]);
+            }
+            //free(pwd_);
+        }
+
+        // External commands 
+        else if(type.compare("B") == 0 or type.compare("E") == 0){
+            x = fork();
+            if(x == 0){
+                status = execvp(args[0][0],args[0]);
+                _exit(0);
             }
         }
         else if(type.compare("C") == 0){
             
         }
+        else if(type.compare("F") == 0){
+            
+        }
 
-        // ERROR handling
+        // Wait for child process to complete
+        if (type.compare("B") == 0){
+            waitpid(-1,&status,0);
+        }
+        
+        ////////////// ERROR HANDLING ////////////
+        //
+        //
         if(status == -1){
             switch(errno){
                 case EACCES:
@@ -151,10 +209,7 @@ int main(){
                     cout << "Unexpected error.\n";
             }
         }
-        // Wait for child process to complete
-        if (type.compare("B") == 0){
-            waitpid(-1,&status,0);
-        }
+       
 	}
 	return 0;
 }
