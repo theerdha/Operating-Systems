@@ -21,7 +21,7 @@ int main(){
 		int status = 0;
 		stringstream stream;
 		// Prompt on terminal
-		cout << "\nSelet one of the following:\nA. Run an internal command.\nB. Run an external command.\nC. Run an external command by redirecting standard input from a file.\nD. Run an external command by redirecting standard output to a file.\nE. Run an external command in background.\nF. Run several external commands in pipe mode.\nG. Quit the shell.\n";
+		cout << "\nSelet one of the following:\nA. Run an internal command.\nB. Run an external command.\nC. Run an external command by redirecting standard input from a file.\nD. Run an external command by redirecting standard output to a file.\nE. Run an external command in background.\nF. Run several external commands in pipe mode.\nG. Quit the shell.\n> ";
         getline(cin, type);
         cin.clear();
 
@@ -30,7 +30,7 @@ int main(){
             break;
 
         // Terminal prompt
-        cout <<"G38shell$ ";
+        cout <<"\nG38shell$ ";
 
 		// Read input command from terminal
 		getline(cin,command[0]);
@@ -47,6 +47,7 @@ int main(){
         if(type.compare("C") == 0 or type.compare("D") == 0){
         
         }
+        // Pre Parisng for pipe. Splits command having pipe into two distinct commands 
         else if(type.compare("F") == 0){
             for(int i = 0; i < command[0].length(); i++){
                 if(command[0][i] == '|'){
@@ -75,6 +76,7 @@ int main(){
 		int loop_count = 1;
         if(type.compare("F") == 0)
             loop_count = 2;
+        
         for(int id = 0; id < loop_count; id++){
             stream.str(command[id]);
             // Split the input command
@@ -85,9 +87,10 @@ int main(){
             // Generic parsing and conversion into char*
             args[id] = new char*[comm[id].size()+1];
             for(int i = 0; i < comm[id].size(); i++){
-                args[id][i] = new char[comm[id][i].length()+1];
+                args[id][i] = new char[1000];
                 comm[id][i].copy(args[id][i],comm[id][i].length());
                 args[id][i][comm[id][i].length()] = '\0';
+                // printf("%s ", args[id][i]);
             }
             args[id][comm[id].size()] = NULL;
         }
@@ -121,8 +124,8 @@ int main(){
             else if(args[0][1][0] != '/'){
                 char* pwd = new char[1000];
                 strcpy(pwd,pwd_);
-                char slash = '/';
-                strcat(pwd,&slash);
+                const char* slash = "/\0";
+                strcat(pwd,slash);
                 strcat(pwd,args[0][1]);
                 strcpy(args[0][1],pwd);
                // printf("%s\n",args[0][1]);
