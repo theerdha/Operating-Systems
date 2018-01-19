@@ -105,67 +105,29 @@ int main(){
 
         else if(type.compare("C") == 0){
                 int count;
-                string filename;
+                string filename,actual_command;
                 string temp = stream.str();
-                int i;
-                int flag = -1;
-
-                for(i = 0; i < temp.length() - 1; i++)
-                {
-                	if(temp[i] == '<' && temp[i+1] != ' ')
-                	{
-                		filename = temp.substr(i+1 , temp.length() - i - 1);
-                		flag = 0;
-                		break;
-                	}
-                }
-
-                char** args;
-
-                if(flag == 0){
-	                stream.str(temp.substr(0,i));
-
-	                while(stream >> piece)
-	                comm.push_back(piece);
-					/*for(count = 0; count < comm.size(); count++)
-					{
-						if (comm[count].compare(">") == 0 || comm[count].compare(">>") == 0 )break;
-					}*/
-					args = new char*[comm.size()+1];
-		            for(int i = 0; i < comm.size(); i++){
-		                args[i] = new char[comm[i].length()+1];
-		                comm[i].copy(args[i],comm[i].length());
-		                args[i][comm[i].length()] = '\0';
-		            }
-		            args[comm.size()] = NULL;
-		        }
-
-		        else
-		        {
-		        	while(stream >> piece)
-	                comm.push_back(piece);
-					for(count = 0; count < comm.size(); count++)
-					{
-						if (comm[count].compare("<") == 0 )break;
-					}
-					args = new char*[count];
-					for(int i = 0; i < count; i++)
-					{
-						args[i] = new char[comm[i].length()+1];
-						comm[i].copy(args[i],comm[i].length());
-						args[i][comm[i].length()] = '\0';
-					}
-					args[count] = NULL;
-		        }
-
-            
+                stringstream actual_stream;
+                int i = temp.find('<');
+				filename = temp.substr(i+1 , temp.length() - i - 1);
+     			actual_command = temp.substr(0,i);
+                stream.str(filename);
+                stream >> filename;
+                actual_stream.str(actual_command);
+	        	while(actual_stream >> piece) comm.push_back(piece);               	
+				char** args = new char*[comm.size()+1];
+	            for(int i = 0; i < comm.size(); i++){
+	                args[i] = new char[comm[i].length()+1];
+	                comm[i].copy(args[i],comm[i].length());
+	                args[i][comm[i].length()] = '\0';
+	            }
+	            args[comm.size()] = NULL;    
 
 				x = fork();
                 if(x == 0){
                     close(0); 
 					int file_desc;
-					if(flag != 0) file_desc = open(comm[count + 1].c_str(), O_RDONLY , S_IRWXU);
-					else file_desc = open(filename.c_str(), O_RDONLY , S_IRWXU);
+					file_desc = open(filename.c_str(), O_RDONLY , S_IRWXU);
 					dup(file_desc);
 					execvp(args[0],args);
 					_exit(0);
