@@ -19,7 +19,6 @@ int main(){
 		string command[2],piece,type;
 		pid_t x;
 		int status = 0;
-		stringstream stream;
 		// Prompt on terminal
 		cout << "\nSelet one of the following:\nA. Run an internal command.\nB. Run an external command.\nC. Run an external command by redirecting standard input from a file.\nD. Run an external command by redirecting standard output to a file.\nE. Run an external command in background.\nF. Run several external commands in pipe mode.\nG. Quit the shell.\n> ";
         getline(cin, type);
@@ -49,17 +48,18 @@ int main(){
         }
         // Pre Parisng for pipe. Splits command having pipe into two distinct commands 
         else if(type.compare("F") == 0){
-            for(int i = 0; i < command[0].length(); i++){
+            int len = command[0].length();
+            for(int i = 0; i < len; i++){
                 if(command[0][i] == '|'){
                    
-                    for(int j = i+1; j < command[0].length(); i++){
+                    for(int j = i+1; j < len; j++){
                         if(command[0][j] != ' '){
-                            command[1] = command[0].substr(j,command[0].length() - j);
+                            command[1] = command[0].substr(j,len - j);
                             break;
                         }
                     }
 
-                    for(int j = i-1; i >= 0; j--){
+                    for(int j = i-1; j >= 0; j--){
                         if(command[0][j] != ' '){
                             command[0] = command[0].substr(0,j+1);
                             break;
@@ -78,23 +78,22 @@ int main(){
             loop_count = 2;
         
         for(int id = 0; id < loop_count; id++){
+            stringstream stream;
             stream.str(command[id]);
             // Split the input command
-    
-            while(stream >> piece)
+            while(stream >> piece){
                 comm[id].push_back(piece);
-
+            }
             // Generic parsing and conversion into char*
             args[id] = new char*[comm[id].size()+1];
             for(int i = 0; i < comm[id].size(); i++){
                 args[id][i] = new char[1000];
                 comm[id][i].copy(args[id][i],comm[id][i].length());
                 args[id][i][comm[id][i].length()] = '\0';
-                // printf("%s ", args[id][i]);
+                //printf("%s ", args[id][i]);
             }
             args[id][comm[id].size()] = NULL;
         }
-      
 
         // Additional parsing for handling file locations for internal commands
         if (type.compare("A") == 0){
@@ -168,14 +167,29 @@ int main(){
             
         }
         else if(type.compare("F") == 0){
-            
+            int pipe1[2];
+            pipe(pipe1);
+            x = fork();
+            if(x == 0){
+                dup2(pipe1[1],STDOUT_FILENO);
+                status = execvp(args[0][0],args[0]);
+                close(pipe1[1]);
+                _exit(0);
+            }
+            else{
+                x = fork();
+                if(x == 0){
+                    dup2(pipe1[0],STDIN_FILENO);
+                    status = execvp(args[1][0],args[1]);
+                    close(pipe1[0]);
+                    _exit(0);
+                }
+            }
         }
 
         // Wait for child process to complete
-        if (type.compare("B") == 0){
-            waitpid(-1,&status,0);
-        }
-        
+        cout << "waiting" << endl;
+        wait(&status);
         ////////////// ERROR HANDLING ////////////
         //
         //
