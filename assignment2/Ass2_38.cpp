@@ -170,22 +170,17 @@ int main(){
             x = fork();
             if(x == 0){
                 if(type.compare("D") == 0){
-                    //close(STDOUT_FILENO);
                     if (mode == 1) 
                         fd = open(args[1][0], O_WRONLY |  O_CREAT , S_IRWXU);
                     else 
                         fd = open(args[1][0], O_WRONLY | O_APPEND |  O_CREAT , S_IRWXU);
-                    //printf("%s\n",args[1][0]);
                     dup2(fd,fileno(stdout));
                 }
                 else {
-                    //close(STDIN_FILENO);
                     fd = open(args[1][0], O_RDONLY , S_IRWXU);
                     dup2(fd,STDIN_FILENO);
                     
                 }
-                //dup(fd);
-                //close(fd);
                 execvp(args[0][0],args[0]);
                 _exit(0);
             }   
@@ -195,20 +190,17 @@ int main(){
             pipe(pipe1);
             x = fork();
             if(x == 0){
-                //close(1);
-                //dup(pipe1[1]);
-                dup2(pipe1[1],STDOUT_FILENO);
-                close(pipe1[1]);
-                status = execvp(args[0][0],args[0]);
-                _exit(0);
-            }
-            wait(NULL);
-            x = fork();
-            if(x == 0){
-                //close(0);
-                //dup(pipe1[0]);
-                dup2(pipe1[0],STDIN_FILENO);
+                dup2(pipe1[1],fileno(stdout));
                 close(pipe1[0]);
+                //printf("%s\n",args[0][0]);
+                execvp(args[0][0],args[0]);
+                _exit(0);
+            } 
+            x = fork(); 
+            if(x == 0){
+                dup2(pipe1[0],fileno(stdin));
+                close(pipe1[1]);
+                //printf("%s\n",args[1][0]);
                 status = execvp(args[1][0],args[1]);
                 _exit(0);
             }
@@ -218,7 +210,8 @@ int main(){
 
         // Wait for child process to complete
         // cout << "waiting" << endl;
-        wait(NULL);
+        if(type.compare("E") != 0)
+            waitpid(-1,&status,0);
         ////////////// ERROR HANDLING ////////////
         //
         //
