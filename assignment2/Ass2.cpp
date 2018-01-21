@@ -62,83 +62,41 @@ int main(){
             }
         }
         else if(type.compare("D") == 0){
-                int count;
-                string filename;
-                int i;
-                int flag = -1;
-                int file_desc;
-                int num = 0;
+                int count,i,file_desc,num = 0;
+                string filename,actual_command;            
                 string temp = stream.str();
-
-                for(i = 0; i < temp.length() - 1; i++)
-                {
-                	if(temp[i] == '>' && temp[i+1] != '>' && temp[i+1] != ' ')
-                	{
+                stringstream actual_stream;
+                for(i = 0; i < temp.length() - 1; i++){
+                	if(temp[i] == '>' && temp[i+1] != '>'){
                 		filename = temp.substr(i+1 , temp.length() - i - 1);
-                		flag = 0;
                 		num = 1;
+                		break;
                 	}
-                	else if((temp[i] == '>' && temp[i+1] == '>') && temp[i+2] != ' ' )
-                	{
+                	else if(temp[i] == '>' && temp[i+1] == '>'){
                 		filename = temp.substr(i+2 , temp.length() - i - 2);
-                		flag = 0;
                 		num = 2;
+                		break;
                 	}
                 }
-
-                char** args;
-
-                if(flag == 0){
-	                stream.str(temp.substr(0,i));
-
-	                while(stream >> piece)
-	                comm.push_back(piece);
-					/*for(count = 0; count < comm.size(); count++)
-					{
-						if (comm[count].compare(">") == 0 || comm[count].compare(">>") == 0 )break;
-					}*/
-					args = new char*[comm.size()+1];
-		            for(int i = 0; i < comm.size(); i++){
-		                args[i] = new char[comm[i].length()+1];
-		                comm[i].copy(args[i],comm[i].length());
-		                args[i][comm[i].length()] = '\0';
-		            }
-		            args[comm.size()] = NULL;
-		        }
-
-		        else
-		        {
-		        	while(stream >> piece)
-	                comm.push_back(piece);
-					for(count = 0; count < comm.size(); count++)
-					{
-						if (comm[count].compare(">") == 0 || comm[count].compare(">>") == 0  )break;
-					}
-					args = new char*[count];
-					for(int i = 0; i < count; i++)
-					{
-						args[i] = new char[comm[i].length()+1];
-						comm[i].copy(args[i],comm[i].length());
-						args[i][comm[i].length()] = '\0';
-					}
-					args[count] = NULL;
-		        }
-
+                //parsing and trimming spaces
+                actual_command = temp.substr(0,i);
+                stream.str(filename);
+                stream >> filename;
+                actual_stream.str(actual_command);
+	        	while(actual_stream >> piece) comm.push_back(piece);               	
+				char** args = new char*[comm.size()+1];
+	            for(int i = 0; i < comm.size(); i++){
+	                args[i] = new char[comm[i].length()+1];
+	                comm[i].copy(args[i],comm[i].length());
+	                args[i][comm[i].length()] = '\0';
+	            }
+	            args[comm.size()] = NULL;      
+	            //child process to execute command
 				x = fork();
                 if(x == 0){
                     close(1); 
-					if(flag != 0)
-					{
-						if (comm[count].compare(">") == 0)file_desc = open(comm[count + 1].c_str(), O_WRONLY |  O_CREAT , S_IRWXU);
-						else file_desc = open(comm[count + 1].c_str(), O_WRONLY | O_APPEND |  O_CREAT , S_IRWXU);
-					}
-
-					else
-					{
-						if (num == 1)file_desc = open(filename.c_str(), O_WRONLY |  O_CREAT , S_IRWXU);
-						else file_desc = open(filename.c_str(), O_WRONLY | O_APPEND |  O_CREAT , S_IRWXU);
-
-					}
+					if (num == 1)file_desc = open(filename.c_str(), O_WRONLY |  O_CREAT , S_IRWXU);
+					else file_desc = open(filename.c_str(), O_WRONLY | O_APPEND |  O_CREAT , S_IRWXU);
 					dup(file_desc);
 					execvp(args[0],args);
 					_exit(0);
@@ -147,71 +105,80 @@ int main(){
 
         else if(type.compare("C") == 0){
                 int count;
-                string filename;
+                string filename,actual_command;
                 string temp = stream.str();
-                int i;
-                int flag = -1;
-
-                for(i = 0; i < temp.length() - 1; i++)
-                {
-                	if(temp[i] == '<' && temp[i+1] != ' ')
-                	{
-                		filename = temp.substr(i+1 , temp.length() - i - 1);
-                		flag = 0;
-                	}
-                }
-
-                char** args;
-
-                if(flag == 0){
-	                stream.str(temp.substr(0,i));
-
-	                while(stream >> piece)
-	                comm.push_back(piece);
-					/*for(count = 0; count < comm.size(); count++)
-					{
-						if (comm[count].compare(">") == 0 || comm[count].compare(">>") == 0 )break;
-					}*/
-					args = new char*[comm.size()+1];
-		            for(int i = 0; i < comm.size(); i++){
-		                args[i] = new char[comm[i].length()+1];
-		                comm[i].copy(args[i],comm[i].length());
-		                args[i][comm[i].length()] = '\0';
-		            }
-		            args[comm.size()] = NULL;
-		        }
-
-		        else
-		        {
-		        	while(stream >> piece)
-	                comm.push_back(piece);
-					for(count = 0; count < comm.size(); count++)
-					{
-						if (comm[count].compare("<") == 0 )break;
-					}
-					args = new char*[count];
-					for(int i = 0; i < count; i++)
-					{
-						args[i] = new char[comm[i].length()+1];
-						comm[i].copy(args[i],comm[i].length());
-						args[i][comm[i].length()] = '\0';
-					}
-					args[count] = NULL;
-		        }
-
-            
+                stringstream actual_stream;
+                int i = temp.find('<');
+				filename = temp.substr(i+1 , temp.length() - i - 1);
+     			actual_command = temp.substr(0,i);
+                stream.str(filename);
+                stream >> filename;
+                actual_stream.str(actual_command);
+	        	while(actual_stream >> piece) comm.push_back(piece);               	
+				char** args = new char*[comm.size()+1];
+	            for(int i = 0; i < comm.size(); i++){
+	                args[i] = new char[comm[i].length()+1];
+	                comm[i].copy(args[i],comm[i].length());
+	                args[i][comm[i].length()] = '\0';
+	            }
+	            args[comm.size()] = NULL;    
 
 				x = fork();
                 if(x == 0){
                     close(0); 
 					int file_desc;
-					if(flag != 0) file_desc = open(comm[count + 1].c_str(), O_RDONLY , S_IRWXU);
-					else file_desc = open(filename.c_str(), O_RDONLY , S_IRWXU);
+					file_desc = open(filename.c_str(), O_RDONLY , S_IRWXU);
 					dup(file_desc);
 					execvp(args[0],args);
 					_exit(0);
                 }				 
         }
+
+       /* else if(type.compare("F") == 0)
+        {
+        	string temp = stream.str();
+        	vector <string> command;
+        	int first = 0;
+
+            for(int i = 0; i < temp.length() - 1; i++)
+            {
+            	if(temp[i] == '|')
+            	{
+            		command.push_back(temp.substr( first , i - first ));
+            		first = i + 1;
+            	}
+            }
+
+            for(int j= 0; j < command.size(); j++)
+            {
+            	stringstream stream;
+            	while(stream.str(command[j]) >> piece)
+                comm.push_back(piece);
+
+	            char** args = new char*[comm.size()+1];
+	            for(int i = 0; i < comm.size(); i++)
+	            {
+	                args[i] = new char[comm[i].length()+1];
+	                comm[i].copy(args[i],comm[i].length());
+	                args[i][comm[i].length()] = '\0';
+	            }
+	            args[comm.size()] = NULL;
+
+	            X = fork();
+
+	            if(X == 0)
+	            {
+	            	
+	            }
+
+	            else
+	            {
+	            	continue;
+	            }
+            }
+
+        }*/
+
         if (type.compare("B") == 0 or type.compare("A") == 0 or type.compare("D") == 0 or type.compare("C") == 0 ){
             waitpid(-1,&status,0);
         }
