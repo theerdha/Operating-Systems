@@ -16,10 +16,14 @@ using namespace std;
 
 int main(){
     while(1){
-        vector<vector<string> > comm(2);
-        string command[2],piece,type;
+        vector<vector<string> > comm;
+        char*** args;
+        vector<string> command;
+        string piece,type;
         pid_t x = 0;
+        string fullCommand;
         int status = 0,mode = 0;
+        
         // Prompt on terminal
         cout << "\nSelet one of the following:\nA. Run an internal command.\nB. Run an external command.\nC. Run an external command by redirecting standard input from a file.\nD. Run an external command by redirecting standard output to a file.\nE. Run an external command in background.\nF. Run several external commands in pipe mode.\nG. Quit the shell.\n> ";
         getline(cin, type);
@@ -33,57 +37,74 @@ int main(){
         cout <<"\nG38shell$ ";
 
         // Read input command from terminal
-        getline(cin,command[0]);
+        getline(cin,fullCommand);
 
-
-        char** args[2];
         bool printhelp = false;
-
 
         ////////////// INPUT PARSING ///////////////////
         //
         //
         // Pre parsing for filedesciptor redirecting and pipe
-        int len = command[0].length();
-        if(type.compare("C") == 0 or type.compare("D") == 0 or type.compare("F") == 0){
+        
+        int len = fullCommand.length();
+        int previousCommandIndex = 0;
+
+        // PRE PARSING FOR FILE REDIRECTION
+        if(type.compare("C") == 0 or type.compare("D") == 0){
             for(int i = 0; i < len-1; i++){
-                if((command[0][i] == '<' && command[0][i+1] != '<') || (command[0][i] == '>' && command[0][i+1] != '>') || command[0][i] == '|'){
-                   command[1] = command[0].substr(i+1,len-i-1);
-                   command[0] = command[0].substr(0,i);
-                   mode = 1;
-                   break;
+                if((fullCommand[i] == '<' && fullCommand[i+1] != '<') || (fullCommand[i] == '>' && fullCommand[i+1] != '>')){
+                    command.push_back(fullCommand.substr(0,i));
+                    command.push_back(fullCommand.substr(i+1,len-i-1));
+                    mode = 1;
+                    break;
                 }
-                if((command[0][i] == '<' && command[0][i+1] == '<') || (command[0][i] == '>' && command[0][i+1] == '>')){
-                    command[1] = command[0].substr(i+2,len-i-2);
-                    command[0] = command[0].substr(0,i);
+                if(fullCommand[i] == '>' && fullCommand[i+1] == '>'){
+                    command.push_back(fullCommand.substr(0,i));
+                    command.push_back(fullCommand.substr(i+2,len-i-2));
                     mode = 2;
                     break;
                 }
             }  
             //cout << command[0] << " " << command[1] << endl;
-        }   
-
-        // command parsing 
-        int loop_count = 1;
-        if(type.compare("F") == 0 || type.compare("C") == 0 || type.compare("D") == 0) 
-            loop_count = 2;
-
-        for(int id = 0; id < loop_count; id++){
+        }
+        // Parsing the input command for pipe and breaking into multiple commands
+        else if(type.compare("F") == 0){
+            for(int i = 0; i < len-1; i++){
+                if(fullCommand[i] == '|'){
+                    command.push_back(fullCommand.substr(previousCommandIndex,i-previousCommandIndex));
+                    previousCommandIndex = i+1;
+                }
+            }
+            
+            command.push_back(fullCommand.substr(previousCommandIndex,len-previousCommandIndex));
+            //for(int i = 0; i < command.size(); i++)
+            //    cout << command[i] << endl;
+        }
+        // Preparsing for remaining cases
+        else{
+            command.push_back(fullCommand);
+        }
+        
+        args = new char**[command.size()];
+        comm = vector<vector<string> >(command.size());
+        
+        // Changing each command into array of char*
+        for(int id = 0; id < command.size(); id++){
             stringstream stream;
+            int i = 0;
+            args[id] = new char*[20];
+
             stream.str(command[id]);
             // Split the input command
             while(stream >> piece){
-                comm[id].push_back(piece);
+                args[id][i] = new char[200];
+                piece.copy(args[id][i],piece.length());
+                args[id][i][piece.length()] = '\0'; 
+                //printf("%s\n",args[id][i]);
+                i++;
             }
-            // Generic parsing and conversion into char*
-            args[id] = new char*[comm[id].size()+1];
-            for(int i = 0; i < comm[id].size(); i++){
-                args[id][i] = new char[1000];
-                comm[id][i].copy(args[id][i],comm[id][i].length());
-                args[id][i][comm[id][i].length()] = '\0';
-                //printf("%s ", args[id][i]);
-            }
-            args[id][comm[id].size()] = NULL;
+            //printf("DONE");
+            args[id][i] = NULL;
         }
 
         // Additional parsing for handling file locations for internal commands
@@ -96,7 +117,7 @@ int main(){
             strcpy(home_dir,home_env);
 
             char* path;
-            
+
             if(type.compare("A") == 0)
                 path = args[0][1];
             else 
@@ -139,19 +160,20 @@ int main(){
         // Internal Commands
         if(type.compare("A") == 0){
             // chdir case
-            if(comm[0][0].compare("chdir") == 0 or comm[0][0].compare("cd") == 0){
-                if(comm[0].size() <=  2)    
-                    status = chdir(args[0][1]);
-                else
-                    cout << "invalid no of arguments passed.\nCorrect usage '$chdir path'.\n";
+            char ch[10] = "chdir";
+            char cd[10] = "cd";
+            char mkd[10] = "mkdir";
+            char rmd[10] = "rmdir";
+            if(strcmp(args[0][0],ch) == 0 or strcmp(args[0][0],cd) == 0){
+                status = chdir(args[0][1]);
             }
 
             // mkdir case
-            else if(comm[0][0].compare("mkdir") == 0 ){
+            else if(strcmp(args[0][0],mkd) == 0 ){
                 mkdir(args[0][1],0700);
             }
             // rmdir case
-            else if(comm[0][0].compare("rmdir") == 0){
+            else if(strcmp(args[0][0],rmd) == 0){
                 rmdir(args[0][1]);
             }
             //free(pwd_);
@@ -179,39 +201,42 @@ int main(){
                 else {
                     fd = open(args[1][0], O_RDONLY , S_IRWXU);
                     dup2(fd,STDIN_FILENO);
-                    
+
                 }
                 execvp(args[0][0],args[0]);
                 _exit(0);
             }   
         }
         else if(type.compare("F") == 0){
-            int pipe1[2];
-            pipe(pipe1);
-            x = fork();
-            if(x == 0){
-                dup2(pipe1[1],fileno(stdout));
-                close(pipe1[0]);
-                //printf("%s\n",args[0][0]);
-                execvp(args[0][0],args[0]);
-                _exit(status);
-            } 
-            x = fork(); 
-            if(x == 0){
-                dup2(pipe1[0],fileno(stdin));
-                close(pipe1[1]);
-                //printf("%s\n",args[1][0]);
-                status = execvp(args[1][0],args[1]);
-                _exit(status);
-            }
-            close(pipe1[0]);
-            close(pipe1[1]);
-        }
+            int fd[2];
+            int inputfd;
+            for(int i = 0; i < command.size(); i++){
+                pipe(fd);
+                x = fork();
+                if(x == 0){
+                    if(i != command.size()-1){
+                        dup2(fd[1],STDOUT_FILENO);
+                        close(fd[1]);
+                    }
+                    if(i != 0){
+                        dup2(inputfd,STDIN_FILENO);
+                        close(inputfd);
+                    }
+                    status = execvp(args[i][0],args[i]);
+                    _exit(status);
+                }
+                close(fd[1]);
+                inputfd = fd[0];        
+                if(wait(&status)<0){
+                    cout << "unexpected error\n";
+                }
 
+            }
+        }
         // Wait for child process to complete
         // cout << "waiting" << endl;
-        if(type.compare("E") != 0)
-                while(wait(&status)>0);
+        if(type.compare("E") != 0 )
+            waitpid(-1,&status,0);
         ////////////// ERROR HANDLING ////////////
         //
         //
