@@ -148,7 +148,7 @@ int main(){
 
             // mkdir case
             else if(comm[0][0].compare("mkdir") == 0 ){
-                mkdir(args[0][1],700);
+                mkdir(args[0][1],0700);
             }
             // rmdir case
             else if(comm[0][0].compare("rmdir") == 0){
@@ -194,7 +194,7 @@ int main(){
                 close(pipe1[0]);
                 //printf("%s\n",args[0][0]);
                 execvp(args[0][0],args[0]);
-                _exit(0);
+                _exit(status);
             } 
             x = fork(); 
             if(x == 0){
@@ -202,7 +202,7 @@ int main(){
                 close(pipe1[1]);
                 //printf("%s\n",args[1][0]);
                 status = execvp(args[1][0],args[1]);
-                _exit(0);
+                _exit(status);
             }
             close(pipe1[0]);
             close(pipe1[1]);
@@ -211,7 +211,7 @@ int main(){
         // Wait for child process to complete
         // cout << "waiting" << endl;
         if(type.compare("E") != 0)
-            waitpid(-1,&status,0);
+                while(wait(&status)>0);
         ////////////// ERROR HANDLING ////////////
         //
         //
