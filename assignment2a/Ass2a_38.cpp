@@ -36,7 +36,7 @@ int main()
 	for(int i = 1; i <= NP + NC; i++){
 		if(fork() == 0){
 			srand (time(NULL) + i);
-			int* myseg = (int *)shmat(shmid,NULL,0);
+			//int* myseg = (int *)shmat(shmid,NULL,0);
 			w = rand() % 5;
 
 			if(i <= NP){
@@ -48,8 +48,8 @@ int main()
 				 usleep(w * 1000);
 				 while(!success){
 					for(int j = 0; j < 5; j++){
-						if(myseg[j] == -1) {
-							myseg[j] = r;
+						if(parentseg[j] == -1) {
+							parentseg[j] = r;
 							success = 1;
 							break;
 						}
@@ -65,9 +65,9 @@ int main()
 				success = 0;
 				while(!success){
 					for(int j = 0; j < 5; j++){
-						if(myseg[j] != -1) {
-							value = myseg[j];
-							myseg[j] = -1;
+						if(parentseg[j] != -1) {
+							value = parentseg[j];
+							parentseg[j] = -1;
 							success = 1;
 							break;
 						}
@@ -76,8 +76,7 @@ int main()
 				}
 				cout << "Consumer" << i - NP << ": " << value << " ,time : " << endl;
 			}
-			shmdt(myseg);
-			shmctl(shmid, IPC_RMID, 0);
+			
 
 		}
 
@@ -90,6 +89,8 @@ int main()
 				for(int k = 0; k < pids.size(); k++){
 					kill(pids[k],SIGQUIT);
 				}
+				shmdt(parentseg);
+				shmctl(shmid, IPC_RMID, 0);
 				_exit(0);
 			}
 			//wait(&status);
@@ -98,5 +99,8 @@ int main()
 		}
 
 	}	
+
+	 for(int i = 0; i < NP + NC; i++) // loop will run n times (n=5)
+     wait(NULL);
 
 }
