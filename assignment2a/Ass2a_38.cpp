@@ -49,16 +49,17 @@ int main(int argn,char** argc){
     if(shm == (int*) -1)
         printf("ERROR occured in assigning address space to shared memory.\n");
 
-    if(shmdt(base) < 0 or shmdt(head) < 0 or shmdt(shm) < 0)
-        printf("ERROR in deallocating address space to shared memory.\n");
-
     *base = 0;
     *head = 0;
+
+
+    if(shmdt(base) < 0 or shmdt(head) < 0 or shmdt(shm) < 0)
+        printf("ERROR in deallocating address space to shared memory.\n");
 
     for(int i = 0; i < np+nc; i++){
         x = fork();
         if(x == 0){
-            srand(time(NULL));
+            srand(time(NULL)*i+1);
             base = (int*) shmat(shmid[1],NULL,0);
             head = (int*) shmat(shmid[2],NULL,0);
             shm = (int*) shmat(shmid[0],NULL,0);        
@@ -69,7 +70,7 @@ int main(int argn,char** argc){
             if(i < np)
                 write_in_memory(shm,base,head,i,bufferSize);   
             else 
-                read_from_memory(shm,base,head,i,bufferSize);
+                read_from_memory(shm,base,head,i-np,bufferSize);
 
             if(shmdt(base) < 0 or shmdt(head) < 0 or shmdt(shm) < 0)
                 printf("ERROR in deallocating address space to shared memory.\n");
@@ -79,7 +80,7 @@ int main(int argn,char** argc){
     }
     for(int i = 0; i < 3; i++)
         shmctl(shmid[i],IPC_RMID,NULL);
-    sleep(1);
+    sleep(20);
     kill(0,SIGTERM);
     return 0;
 }
@@ -93,6 +94,7 @@ void write_in_memory(int* shm,int* base,int* head,int index,int bufferSize){
     *head = (*head + 1)%bufferSize;
     result = std::time(NULL);
     cout << "Producer " << index << ": " << value << " time : " <<  ctime(&result) << "\n";
+    //cout << "HEAD: " << *head << "BASE:" << *base << endl;
     return;
 }
 
@@ -103,5 +105,6 @@ void read_from_memory(int * shm, int* base, int* head,int index,int bufferSize){
     result = std::time(NULL);
     cout << "Consumer " << index << ": " << shm[*base] << " time : " <<  ctime(&result) << "\n";
     *base = (*base + 1)%bufferSize;
+    //cout << "HEAD: " << *head << "BASE:" << *base << endl;
     return;
 }
