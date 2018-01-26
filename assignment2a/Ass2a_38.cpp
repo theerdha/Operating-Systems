@@ -23,40 +23,36 @@ int main(int argn,char** argc){
     int x;
     key_t key[3];
     for(int i = 0; i < 3; i++){
-        if(key[i] = ftok("./",i+1) < 0)
+        if(key[i] = ftok(argc[3],i+1) < 0)
            printf("ERROR in generating key\n");
     }
 
-    if(shmget(key[0],bufferSize*sizeof(int),IPC_CREAT|IPC_EXCL|0600) < 0)
+    if(shmid[0] = shmget(key[0],bufferSize*sizeof(int),IPC_CREAT|IPC_EXCL|0700) < 0)
         printf("ERROR occured in shared memory allocation.\n");
     
-    if(shmget(key[1],sizeof(int),IPC_CREAT|IPC_EXCL|0600) < 0)
+    if(shmid[1] = shmget(key[1],sizeof(int),IPC_CREAT|IPC_EXCL|0700) < 0)
         printf("ERROR occured in shared memory allocation.\n");
     
-    if(shmget(key[2],sizeof(int),IPC_CREAT|IPC_EXCL|0600) < 0)
+    if(shmid[2] = shmget(key[2],sizeof(int),IPC_CREAT|IPC_EXCL|0700) < 0)
         printf("ERROR occured in shared memory allocation.\n");
     
     base = (int*) shmat(shmid[1],NULL,0);
     head = (int*) shmat(shmid[2],NULL,0);
     shm = (int*) shmat(shmid[0],NULL,0);        
     
-    *base = 0;
-    *head = 0;
-   
+    if(base == (int*) -1 or head == (int*) -1 or shm == (int*) -1)
+        printf("ERROR occured in assigning address space to shared memory.\n");
+    /*
     if(shmdt(base) < 0 or shmdt(head) < 0 or shmdt(shm) < 0)
         printf("ERROR in deallocating address space to shared memory.\n");
-    
+ 
+    *base = 0;
+    *head = 0;
+
     for(int i = 0; i < np+nc; i++){
         x = fork();
         if(x == 0){
             srand(time(NULL));
-            if(shmid[0] = shmget(key[0],bufferSize*sizeof(int),0) < 0)
-                printf("ERROR occured in shared memory allocation.\n");
-            if(shmid[1] = shmget(key[1],sizeof(int),0) < 0)
-                printf("ERROR occured in shared memory allocation.\n");
-            if(shmid[2] = shmget(key[2],sizeof(int),0) < 0)
-                printf("ERROR occured in shared memory allocation.\n");
-
             base = (int*) shmat(shmid[1],NULL,0);
             head = (int*) shmat(shmid[2],NULL,0);
             shm = (int*) shmat(shmid[0],NULL,0);        
@@ -74,8 +70,7 @@ int main(int argn,char** argc){
             
             _exit(0);
         }
-    }
-
+    }*/
     for(int i = 0; i < 3; i++)
         shmctl(shmid[i],IPC_RMID,NULL);
     sleep(100);
