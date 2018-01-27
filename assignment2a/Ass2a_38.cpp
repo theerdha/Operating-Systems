@@ -16,6 +16,9 @@ using namespace std;
 void read_from_memory(int*,int*,int*,int,int);
 void write_in_memory(int*,int*,int*,int,int);
 
+int prime_numbers[] = { 2, 3, 5, 7, 11, 13, 17, 19, 23, 29, 31, 37, 41, 43, 47, 53, 59, 61, 67, 71, 
+        73, 79, 83, 89, 97,101, 103, 107, 109, 113, 127, 131, 137, 139, 149,151, 157, 163, 167, 173, 179, 181, 191, 193, 197, 199};
+
 int main(int argn,char** argc){
     int shmid[3];
     int np = atoi(argc[1]);
@@ -80,13 +83,13 @@ int main(int argn,char** argc){
     }
     for(int i = 0; i < 3; i++)
         shmctl(shmid[i],IPC_RMID,NULL);
-    sleep(20);
+    sleep(10);
     kill(0,SIGTERM);
     return 0;
 }
 
 void write_in_memory(int* shm,int* base,int* head,int index,int bufferSize){
-    int value = rand()%1000;
+    int value = prime_numbers[rand()%45];
     time_t result;
     sleep(rand()%6);
     while((*head+1)%bufferSize  == *base){}
