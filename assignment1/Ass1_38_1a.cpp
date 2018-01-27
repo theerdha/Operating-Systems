@@ -4,7 +4,7 @@
 #include <algorithm>
 #include <stdlib.h>
 #include <time.h>
-
+#include <sys/wait.h>
 using namespace std;
 
 int main(){
@@ -80,13 +80,16 @@ int main(){
 						cout << list2[j] << " ";
 						j++;
 					}
-					else{
+					else if(k < 100){
 						cout << list3[k] << " ";
 						k++;
 					}
 				}
+				cout << endl;
 			}
 		}
 	}
+	int status;
+	waitpid(-1,&status,0);
 	return 0;
 }
