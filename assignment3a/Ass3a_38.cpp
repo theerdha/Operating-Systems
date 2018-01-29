@@ -66,13 +66,13 @@ int isIn( vector<int> v,int index)
 	return -1;
 }
 
-int minRem(vector<int> v)
+int minRem(vector<int> v,int index,vector<int> a)
 {
 	int minVal = 1000000;
 	int minIndex = 0;
 	for(int i = 0; i < v.size(); i++)
 	{
-		if(v[i] < minVal)
+		if(v[i] < minVal && v[i] != 0 && a[i] <= index)
 		{
 			minVal = v[i];
 			minIndex = i ;
@@ -98,12 +98,13 @@ double PremtiveSJF( vector<int> arrT, vector<int> BT)
 	
 	while(!Allzeros(remT))
 	{
+		
+		if(isIn(arrT,index) >= 0 || remT[currProcess] == 0)
+		{
+			currProcess = minRem(remT,index, arrT);
+		}
 		index ++;
 		remT[currProcess] --;
-		if(isIn(arrT,index) >= 0)
-		{
-			currProcess = minRem(remT);
-		}
 		for(int i = 0; i < arrT.size(); i++)
 		{
 			if(remT[i] == 0 && !finishMarker[i])
@@ -112,6 +113,7 @@ double PremtiveSJF( vector<int> arrT, vector<int> BT)
 				finishMarker[i] = true;
 			}
 		}
+		
 	}
 	
 	double ATN = 0;
