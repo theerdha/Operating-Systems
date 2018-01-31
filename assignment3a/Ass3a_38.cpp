@@ -7,7 +7,7 @@
 
 using namespace std;
 
-#define L 0.05
+#define L 0.5
 
 double expo_dist(double lambda){
     double u;
@@ -21,31 +21,6 @@ int max(int a, int b)
 	else return b;
 }
 
-double FCFS( vector<int> arrT, vector<int> BT)
-{
-	vector<int> finishT;
-	finishT.push_back(BT[0]);
-	int FT;
-	for(int i = 1; i < arrT.size(); i++)
-	{
-		FT = BT[i] + max(finishT[i-1],arrT[i]);
-		finishT.push_back(FT);
-	}
-	
-	double ATN = 0;
-	for(int i = 0 ; i < arrT.size(); i++)
-	{
-		ATN += (finishT[i] - arrT[i]);
-	}
-	
-	for(int i = 0 ; i < arrT.size(); i++)
-	{
-		cout << "finsh : " << i + 1 << " : " << finishT[i] << endl;
-	}
-	
-	ATN = ATN/arrT.size();
-	return ATN;
-}
 
 bool Allzeros(vector<int> v)
 {
@@ -81,8 +56,36 @@ int minRem(vector<int> v,int index,vector<int> a)
 	return minIndex;
 }
 
+double FCFS( vector<int> arrT, vector<int> BT)
+{
+	cout << endl << "FCFS......" << endl << endl;
+	vector<int> finishT;
+	finishT.push_back(BT[0]);
+	int FT;
+	for(int i = 1; i < arrT.size(); i++)
+	{
+		FT = BT[i] + max(finishT[i-1],arrT[i]);
+		finishT.push_back(FT);
+	}
+	
+	double ATN = 0;
+	for(int i = 0 ; i < arrT.size(); i++)
+	{
+		ATN += (finishT[i] - arrT[i]);
+	}
+	
+	for(int i = 0 ; i < arrT.size(); i++)
+	{
+		cout << "finsh : " << i + 1 << " : " << finishT[i] << endl;
+	}
+	
+	ATN = ATN/arrT.size();
+	return ATN;
+}
+
 double PremtiveSJF( vector<int> arrT, vector<int> BT)
 {
+	cout << endl << "PremtiveSJF......" << endl << endl;
 	vector<int> remT;
 	vector<int> finishT(arrT.size());
 	vector<bool> finishMarker(arrT.size());
@@ -131,6 +134,54 @@ double PremtiveSJF( vector<int> arrT, vector<int> BT)
 	return ATN;
 }
 
+double RoundRobin(int TimeQuantum, vector<int> arrT, vector<int> BT)
+{
+	cout << endl << "RoundRobin with Quantum : "  << TimeQuantum <<" ....." << endl << endl;
+	int time = 0;
+	vector<int> remT;
+	vector<int> finishT(arrT.size());
+	int currProcess = 0;
+	
+	for(int i = 0; i < arrT.size(); i++)
+	{
+		remT.push_back(BT[i]);
+	}
+	
+	while(!Allzeros(remT))
+	{
+		time ++;
+
+		remT[currProcess] --;
+		if(remT[currProcess] == 0)
+		{
+			finishT[currProcess] = time;
+		}
+
+		if(time % TimeQuantum == 0 || remT[currProcess] == 0)
+		{
+			while(!Allzeros(remT))
+			{
+				currProcess = (currProcess + 1) % arrT.size();
+				if(remT[currProcess] != 0 && arrT[currProcess] <= time) break;
+			}
+		}		
+
+	}
+	double ATN = 0;
+	for(int i = 0 ; i < arrT.size(); i++)
+	{
+		ATN += (finishT[i] - arrT[i]);
+	}
+	
+	for(int i = 0 ; i < arrT.size(); i++)
+	{
+		cout << "finsh : " << i + 1 << " : " << finishT[i] << endl;
+	}
+	
+	ATN = ATN/arrT.size();
+	return ATN;
+}
+
 int main()
 {
 	int N; cin >> N;
@@ -160,6 +211,10 @@ int main()
 	
 	cout << "ATN in FCFS : " << FCFS(arrivalTime,burstTime) << endl;	
 	cout << "ATN in premtive SJF : " << PremtiveSJF(arrivalTime,burstTime) << endl;	
+	cout << "ATN in RoundRobin with time Quantum 1 : " << RoundRobin(1,arrivalTime,burstTime) << endl;	
+	cout << "ATN in RoundRobin with time Quantum 2 : " << RoundRobin(2,arrivalTime,burstTime) << endl;	
+	cout << "ATN in RoundRobin with time Quantum 5 : " << RoundRobin(5,arrivalTime,burstTime) << endl;	
+	
 	return 0 ;
 }
 
