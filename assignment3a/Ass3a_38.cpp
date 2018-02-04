@@ -4,6 +4,7 @@
 #include <vector>
 #include <math.h>
 #include <time.h>
+#include <fstream>
 
 using namespace std;
 
@@ -17,7 +18,7 @@ double expo_dist(double lambda){
 
 int max(int a, int b)
 {
-	if(a > b) return a;
+    if(a > b) return a;
 	else return b;
 }
 
@@ -184,37 +185,58 @@ double RoundRobin(int TimeQuantum, vector<int> arrT, vector<int> BT)
 
 int main()
 {
-	int N; cin >> N;
-	vector <int> arrivalTime;
-	vector <int> burstTime;
-	arrivalTime.push_back(0);
-	srand (time(NULL));
-	for(int i = 0; i < N; i++)
-	{
-		burstTime.push_back(rand()%20 + 1);
-	}
+    int N; 
+    cout << "Enter number of process to run : ";
+    cin >> N;
+	ofstream myfile;
+    myfile.open ("Processtables.txt",std::ios_base::app);
+	myfile << "Processes for N = " << N << endl << endl;
+    double avgfcfs = 0,avgsjf = 0,avgrr1 = 0,avgrr2 = 0,avgrr5 = 0;
+    int r = 10;
 	
-	int inter_arrival_time;
-	
-	for(int i = 1; i < N; i++)
-	{
-		inter_arrival_time = ((int)expo_dist(L)) % 11;
-		arrivalTime.push_back(arrivalTime[i - 1] + inter_arrival_time);
-	}
-	
-	for(int i = 0; i < N; i++)
-	{
-		cout << "Process " << i + 1 << endl;
-		cout << "Arrival time : " << arrivalTime[i] << endl;
-		cout << "CPU burst time : " << burstTime[i] << endl;
-	} 
-	
-	cout << "ATN in FCFS : " << FCFS(arrivalTime,burstTime) << endl;	
-	cout << "ATN in premtive SJF : " << PremtiveSJF(arrivalTime,burstTime) << endl;	
-	cout << "ATN in RoundRobin with time Quantum 1 : " << RoundRobin(1,arrivalTime,burstTime) << endl;	
-	cout << "ATN in RoundRobin with time Quantum 2 : " << RoundRobin(2,arrivalTime,burstTime) << endl;	
-	cout << "ATN in RoundRobin with time Quantum 5 : " << RoundRobin(5,arrivalTime,burstTime) << endl;	
-	
-	return 0 ;
+    while(r--){
+
+        vector <int> arrivalTime;
+        vector <int> burstTime;
+        arrivalTime.push_back(0);
+        srand (time(NULL));
+
+        for(int i = 0; i < N; i++)
+        {
+            burstTime.push_back(rand()%20 + 1);
+        }
+
+        int inter_arrival_time;
+
+        for(int i = 1; i < N; i++)
+        {
+            inter_arrival_time = ((int)expo_dist(L)) % 11;
+            arrivalTime.push_back(arrivalTime[i - 1] + inter_arrival_time);
+        }
+
+		myfile << "Case "<< 10 - r << endl << endl; 
+
+        for(int i = 0; i < N; i++)
+        {
+            myfile << "Process " << i + 1 << "		";
+            myfile << "Arrival time : " << arrivalTime[i] << "		";
+            myfile << "CPU burst time : " << burstTime[i] << endl;
+        } 
+		myfile << endl;
+
+        avgfcfs += FCFS(arrivalTime,burstTime);	
+        avgsjf += PremtiveSJF(arrivalTime,burstTime);	
+        avgrr1 += RoundRobin(1,arrivalTime,burstTime);	
+        avgrr2 += RoundRobin(2,arrivalTime,burstTime);	
+        avgrr5 += RoundRobin(5,arrivalTime,burstTime);	
+    }
+    cout << "\nAVG ATN fcfs: " << avgfcfs/10.0 << endl;
+    cout << "AVG ATN sjf: " << avgsjf/10.0 << endl;
+    cout << "AVG ATN rr1: " << avgrr1/10.0 << endl;
+    cout << "AVG ATN rr2: " << avgrr2/10.0 << endl;
+    cout << "AVG ATN rr5: " << avgrr5/10.0 << endl;
+	myfile.close();
+    return 0 ;
 }
+
 

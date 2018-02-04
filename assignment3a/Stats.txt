@@ -1,0 +1,25 @@
+N = 10
+
+AVG ATN fcfs: 41.6
+AVG ATN sjf: 32.8
+AVG ATN rr1: 56.8
+AVG ATN rr2: 58.6
+AVG ATN rr5: 55.7
+
+N = 50
+
+AVG ATN fcfs: 258.3
+AVG ATN sjf: 176.5
+AVG ATN rr1: 345.76
+AVG ATN rr2: 343.54
+AVG ATN rr5: 344.38
+
+N = 100
+
+AVG ATN fcfs: 444.01
+AVG ATN sjf: 300.39
+AVG ATN rr1: 612.76
+AVG ATN rr2: 619.3
+AVG ATN rr5: 605.2
+
+
