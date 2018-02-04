@@ -5,6 +5,7 @@
 #include <math.h>
 #include <time.h>
 #include <fstream>
+#include <time.h>
 
 using namespace std;
 
@@ -14,9 +15,13 @@ using namespace std;
 
 // Generates Random Numbers from Exponential Distribution
 double expo_dist(double lambda){
-    double u;
-    u = rand() / (RAND_MAX + 1.0);
-    return -log(1- u) / lambda;
+    double u,v = 20;
+	while(!(v >= 0 && v <= 10))
+   	{
+		 u = rand() / (RAND_MAX + 1.0);
+		 v = -log(1- u) / lambda;
+	}
+    return v;
 }
 
 //Compare
@@ -37,6 +42,16 @@ bool Allzeros(vector<int> v)
 	return true;
 }
 
+//Checks if it is the case that no process has currently arrived.
+bool allNotArrive(vector<int> v,vector<int> r,int time)
+{
+	for(int i = 0; i < v.size(); i++)
+	{
+		if(v[i] <= time && r[i] != 0)return false;
+	}
+	return true;
+}
+
 // checks for the presence of an element in vector
 int isIn( vector<int> v,int index)
 {
@@ -51,7 +66,7 @@ int isIn( vector<int> v,int index)
 int minRem(vector<int> v,int index,vector<int> a)
 {
 	int minVal = 1000000;
-	int minIndex = 0;
+	int minIndex = -1;
 	for(int i = 0; i < v.size(); i++)
 	{
 		if(v[i] < minVal && v[i] != 0 && a[i] <= index)
@@ -116,13 +131,17 @@ double PremtiveSJF( vector<int> arrT, vector<int> BT)
 	
 	while(!Allzeros(remT))
 	{
+
+		index ++;
+		if(currProcess != -1)remT[currProcess] --;
+
 		// Checks when a new process arrives or current process is over
-		if(isIn(arrT,index) >= 0 || remT[currProcess] == 0)
+		if(isIn(arrT,index) >= 0 || (currProcess != -1 && remT[currProcess] == 0))
 		{
 			currProcess = minRem(remT,index, arrT);
+			if(currProcess == -1) continue;
 		}
-		index ++;
-		remT[currProcess] --;
+		
 		for(int i = 0; i < arrT.size(); i++)
 		{
 			/// To mark completed processes
@@ -173,22 +192,28 @@ double RoundRobin(int TimeQuantum, vector<int> arrT, vector<int> BT)
 		//Simulates time		
 		time ++;
 
-		remT[currProcess] --;
-		if(remT[currProcess] == 0)
+		if(currProcess != -1)
 		{
-			finishT[currProcess] = time;
+			remT[currProcess] --;
+			if(remT[currProcess] == 0)
+			{
+				finishT[currProcess] = time;
+			}
 		}
 		
 		// On a time quatum interrupt or completion of a process
 
-		if(time % TimeQuantum == 0 || remT[currProcess] == 0)
+		if(time % TimeQuantum == 0 || currProcess != -1 && remT[currProcess] == 0)
 		{
-			while(!Allzeros(remT))
+			for(int i = 0; i < arrT.size(); i++)
 			{
 				// Chooses the next process
 				currProcess = (currProcess + 1) % arrT.size();
 				if(remT[currProcess] != 0 && arrT[currProcess] <= time) break;
 			}
+			
+			if(allNotArrive(arrT,remT,time))currProcess = -1;			
+		
 		}		
 
 	}
@@ -224,13 +249,13 @@ int main()
 
     // Number of test cases
 	int r = 10;
-	
+	srand (time(NULL));
     while(r--){
 
+		
         vector <int> arrivalTime;
         vector <int> burstTime;
         arrivalTime.push_back(0);
-        srand (time(NULL));
 
         for(int i = 0; i < N; i++)
         {
