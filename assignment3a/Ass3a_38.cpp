@@ -18,168 +18,168 @@ double expo_dist(double lambda){
 int max(int a, int b)
 {
     if(a > b) return a;
-    else return b;
+	else return b;
 }
 
 
 bool Allzeros(vector<int> v)
 {
-    for(int i = 0; i < v.size(); i++)
-    {
-        if(v[i] != 0)return false;
-    }
-
-    return true;
+	for(int i = 0; i < v.size(); i++)
+	{
+		if(v[i] != 0)return false;
+	}
+	
+	return true;
 }
 
 int isIn( vector<int> v,int index)
 {
-    for(int i = 0; i < v.size(); i++)
-    {
-        if(v[i] == index)return i;
-    }
-    return -1;
+	for(int i = 0; i < v.size(); i++)
+	{
+		if(v[i] == index)return i;
+	}
+	return -1;
 }
 
 int minRem(vector<int> v,int index,vector<int> a)
 {
-    int minVal = 1000000;
-    int minIndex = 0;
-    for(int i = 0; i < v.size(); i++)
-    {
-        if(v[i] < minVal && v[i] != 0 && a[i] <= index)
-        {
-            minVal = v[i];
-            minIndex = i ;
-        }
-    }
-    return minIndex;
+	int minVal = 1000000;
+	int minIndex = 0;
+	for(int i = 0; i < v.size(); i++)
+	{
+		if(v[i] < minVal && v[i] != 0 && a[i] <= index)
+		{
+			minVal = v[i];
+			minIndex = i ;
+		}
+	}
+	return minIndex;
 }
 
 double FCFS( vector<int> arrT, vector<int> BT)
 {
-    cout << endl << "FCFS......" << endl << endl;
-    vector<int> finishT;
-    finishT.push_back(BT[0]);
-    int FT;
-    for(int i = 1; i < arrT.size(); i++)
-    {
-        FT = BT[i] + max(finishT[i-1],arrT[i]);
-        finishT.push_back(FT);
-    }
-
-    double ATN = 0;
-    for(int i = 0 ; i < arrT.size(); i++)
-    {
-        ATN += (finishT[i] - arrT[i]);
-    }
-
-    for(int i = 0 ; i < arrT.size(); i++)
-    {
-        cout << "finsh : " << i + 1 << " : " << finishT[i] << endl;
-    }
-
-    ATN = ATN/arrT.size();
-    return ATN;
+	cout << endl << "FCFS......" << endl << endl;
+	vector<int> finishT;
+	finishT.push_back(BT[0]);
+	int FT;
+	for(int i = 1; i < arrT.size(); i++)
+	{
+		FT = BT[i] + max(finishT[i-1],arrT[i]);
+		finishT.push_back(FT);
+	}
+	
+	double ATN = 0;
+	for(int i = 0 ; i < arrT.size(); i++)
+	{
+		ATN += (finishT[i] - arrT[i]);
+	}
+	
+	for(int i = 0 ; i < arrT.size(); i++)
+	{
+		cout << "finsh : " << i + 1 << " : " << finishT[i] << endl;
+	}
+	
+	ATN = ATN/arrT.size();
+	return ATN;
 }
 
 double PremtiveSJF( vector<int> arrT, vector<int> BT)
 {
-    cout << endl << "PremtiveSJF......" << endl << endl;
-    vector<int> remT;
-    vector<int> finishT(arrT.size());
-    vector<bool> finishMarker(arrT.size());
-    int currProcess = 0;
-
-    for(int i = 0; i < arrT.size(); i++)
-    {
-        remT.push_back(BT[i]);
-        finishMarker[i] = false;
-    }
-
-    int index = 0;
-
-    while(!Allzeros(remT))
-    {
-
-        if(isIn(arrT,index) >= 0 || remT[currProcess] == 0)
-        {
-            currProcess = minRem(remT,index, arrT);
-        }
-        index ++;
-        remT[currProcess] --;
-        for(int i = 0; i < arrT.size(); i++)
-        {
-            if(remT[i] == 0 && !finishMarker[i])
-            {
-                finishT[i] = index;
-                finishMarker[i] = true;
-            }
-        }
-
-    }
-
-    double ATN = 0;
-    for(int i = 0 ; i < arrT.size(); i++)
-    {
-        ATN += (finishT[i] - arrT[i]);
-    }
-
-    for(int i = 0 ; i < arrT.size(); i++)
-    {
-        cout << "finsh : " << i + 1 << " : " << finishT[i] << endl;
-    }
-
-    ATN = ATN/arrT.size();
-    return ATN;
+	cout << endl << "PremtiveSJF......" << endl << endl;
+	vector<int> remT;
+	vector<int> finishT(arrT.size());
+	vector<bool> finishMarker(arrT.size());
+	int currProcess = 0;
+	
+	for(int i = 0; i < arrT.size(); i++)
+	{
+		remT.push_back(BT[i]);
+		finishMarker[i] = false;
+	}
+	
+	int index = 0;
+	
+	while(!Allzeros(remT))
+	{
+		
+		if(isIn(arrT,index) >= 0 || remT[currProcess] == 0)
+		{
+			currProcess = minRem(remT,index, arrT);
+		}
+		index ++;
+		remT[currProcess] --;
+		for(int i = 0; i < arrT.size(); i++)
+		{
+			if(remT[i] == 0 && !finishMarker[i])
+			{
+				finishT[i] = index;
+				finishMarker[i] = true;
+			}
+		}
+		
+	}
+	
+	double ATN = 0;
+	for(int i = 0 ; i < arrT.size(); i++)
+	{
+		ATN += (finishT[i] - arrT[i]);
+	}
+	
+	for(int i = 0 ; i < arrT.size(); i++)
+	{
+		cout << "finsh : " << i + 1 << " : " << finishT[i] << endl;
+	}
+	
+	ATN = ATN/arrT.size();
+	return ATN;
 }
 
 double RoundRobin(int TimeQuantum, vector<int> arrT, vector<int> BT)
 {
-    cout << endl << "RoundRobin with Quantum : "  << TimeQuantum <<" ....." << endl << endl;
-    int time = 0;
-    vector<int> remT;
-    vector<int> finishT(arrT.size());
-    int currProcess = 0;
+	cout << endl << "RoundRobin with Quantum : "  << TimeQuantum <<" ....." << endl << endl;
+	int time = 0;
+	vector<int> remT;
+	vector<int> finishT(arrT.size());
+	int currProcess = 0;
+	
+	for(int i = 0; i < arrT.size(); i++)
+	{
+		remT.push_back(BT[i]);
+	}
+	
+	while(!Allzeros(remT))
+	{
+		time ++;
 
-    for(int i = 0; i < arrT.size(); i++)
-    {
-        remT.push_back(BT[i]);
-    }
+		remT[currProcess] --;
+		if(remT[currProcess] == 0)
+		{
+			finishT[currProcess] = time;
+		}
 
-    while(!Allzeros(remT))
-    {
-        time ++;
+		if(time % TimeQuantum == 0 || remT[currProcess] == 0)
+		{
+			while(!Allzeros(remT))
+			{
+				currProcess = (currProcess + 1) % arrT.size();
+				if(remT[currProcess] != 0 && arrT[currProcess] <= time) break;
+			}
+		}		
 
-        remT[currProcess] --;
-        if(remT[currProcess] == 0)
-        {
-            finishT[currProcess] = time;
-        }
-
-        if(time % TimeQuantum == 0 || remT[currProcess] == 0)
-        {
-            while(!Allzeros(remT))
-            {
-                currProcess = (currProcess + 1) % arrT.size();
-                if(remT[currProcess] != 0 && arrT[currProcess] <= time) break;
-            }
-        }		
-
-    }
-    double ATN = 0;
-    for(int i = 0 ; i < arrT.size(); i++)
-    {
-        ATN += (finishT[i] - arrT[i]);
-    }
-
-    for(int i = 0 ; i < arrT.size(); i++)
-    {
-        cout << "finsh : " << i + 1 << " : " << finishT[i] << endl;
-    }
-
-    ATN = ATN/arrT.size();
-    return ATN;
+	}
+	double ATN = 0;
+	for(int i = 0 ; i < arrT.size(); i++)
+	{
+		ATN += (finishT[i] - arrT[i]);
+	}
+	
+	for(int i = 0 ; i < arrT.size(); i++)
+	{
+		cout << "finsh : " << i + 1 << " : " << finishT[i] << endl;
+	}
+	
+	ATN = ATN/arrT.size();
+	return ATN;
 }
 
 int main()
