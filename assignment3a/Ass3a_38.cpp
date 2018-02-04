@@ -10,19 +10,23 @@ using namespace std;
 
 #define L 0.5
 
+//////// Utitlity FUnctions ////////
+
+// Generates Random Numbers from Exponential Distribution
 double expo_dist(double lambda){
     double u;
     u = rand() / (RAND_MAX + 1.0);
     return -log(1- u) / lambda;
 }
 
+//Compare
 int max(int a, int b)
 {
     if(a > b) return a;
 	else return b;
 }
 
-
+//Checks if All the entries of a vector are zero or not
 bool Allzeros(vector<int> v)
 {
 	for(int i = 0; i < v.size(); i++)
@@ -33,6 +37,7 @@ bool Allzeros(vector<int> v)
 	return true;
 }
 
+// checks for the presence of an element in vector
 int isIn( vector<int> v,int index)
 {
 	for(int i = 0; i < v.size(); i++)
@@ -42,6 +47,7 @@ int isIn( vector<int> v,int index)
 	return -1;
 }
 
+// Returns the process with minimum remaining burst time
 int minRem(vector<int> v,int index,vector<int> a)
 {
 	int minVal = 1000000;
@@ -56,6 +62,10 @@ int minRem(vector<int> v,int index,vector<int> a)
 	}
 	return minIndex;
 }
+
+////////////// Simulates First Come First Serve Scheduling Algorithm ////////////////////
+///// Inputs : Arrival Time, CPU Burst Time
+///// Ouput : Average ATN
 
 double FCFS( vector<int> arrT, vector<int> BT)
 {
@@ -84,6 +94,10 @@ double FCFS( vector<int> arrT, vector<int> BT)
 	return ATN;
 }
 
+////////////// Simulates Preemtive version of Shortest Job First Scheduling Algorithm ////////////////////
+///// Inputs : Arrival Time, CPU Burst Time
+///// Ouput : Average ATN
+
 double PremtiveSJF( vector<int> arrT, vector<int> BT)
 {
 	cout << endl << "PremtiveSJF......" << endl << endl;
@@ -102,7 +116,7 @@ double PremtiveSJF( vector<int> arrT, vector<int> BT)
 	
 	while(!Allzeros(remT))
 	{
-		
+		// Checks when a new process arrives or current process is over
 		if(isIn(arrT,index) >= 0 || remT[currProcess] == 0)
 		{
 			currProcess = minRem(remT,index, arrT);
@@ -111,6 +125,7 @@ double PremtiveSJF( vector<int> arrT, vector<int> BT)
 		remT[currProcess] --;
 		for(int i = 0; i < arrT.size(); i++)
 		{
+			/// To mark completed processes
 			if(remT[i] == 0 && !finishMarker[i])
 			{
 				finishT[i] = index;
@@ -120,6 +135,7 @@ double PremtiveSJF( vector<int> arrT, vector<int> BT)
 		
 	}
 	
+	// To calculate average ATN
 	double ATN = 0;
 	for(int i = 0 ; i < arrT.size(); i++)
 	{
@@ -134,6 +150,10 @@ double PremtiveSJF( vector<int> arrT, vector<int> BT)
 	ATN = ATN/arrT.size();
 	return ATN;
 }
+
+////////////// Simulates Round Robin Scheduling Algorithm ////////////////////
+///// Inputs : Time Quantum, Arrival Time, CPU Burst Time
+///// Ouput : Average ATN
 
 double RoundRobin(int TimeQuantum, vector<int> arrT, vector<int> BT)
 {
@@ -150,6 +170,7 @@ double RoundRobin(int TimeQuantum, vector<int> arrT, vector<int> BT)
 	
 	while(!Allzeros(remT))
 	{
+		//Simulates time		
 		time ++;
 
 		remT[currProcess] --;
@@ -157,11 +178,14 @@ double RoundRobin(int TimeQuantum, vector<int> arrT, vector<int> BT)
 		{
 			finishT[currProcess] = time;
 		}
+		
+		// On a time quatum interrupt or completion of a process
 
 		if(time % TimeQuantum == 0 || remT[currProcess] == 0)
 		{
 			while(!Allzeros(remT))
 			{
+				// Chooses the next process
 				currProcess = (currProcess + 1) % arrT.size();
 				if(remT[currProcess] != 0 && arrT[currProcess] <= time) break;
 			}
@@ -169,6 +193,9 @@ double RoundRobin(int TimeQuantum, vector<int> arrT, vector<int> BT)
 
 	}
 	double ATN = 0;
+
+	// Computes average ATN
+
 	for(int i = 0 ; i < arrT.size(); i++)
 	{
 		ATN += (finishT[i] - arrT[i]);
@@ -188,11 +215,15 @@ int main()
     int N; 
     cout << "Enter number of process to run : ";
     cin >> N;
+
+	//FIle handling
 	ofstream myfile;
     myfile.open ("Processtables.txt",std::ios_base::app);
 	myfile << "Processes for N = " << N << endl << endl;
     double avgfcfs = 0,avgsjf = 0,avgrr1 = 0,avgrr2 = 0,avgrr5 = 0;
-    int r = 10;
+
+    // Number of test cases
+	int r = 10;
 	
     while(r--){
 
@@ -216,6 +247,7 @@ int main()
 
 		myfile << "Case "<< 10 - r << endl << endl; 
 
+		// Stores the Arrival time and CPU burst time for processes
         for(int i = 0; i < N; i++)
         {
             myfile << "Process " << i + 1 << "		";
@@ -223,6 +255,8 @@ int main()
             myfile << "CPU burst time : " << burstTime[i] << endl;
         } 
 		myfile << endl;
+
+		// Computes average on 10 test cases
 
         avgfcfs += FCFS(arrivalTime,burstTime);	
         avgsjf += PremtiveSJF(arrivalTime,burstTime);	
