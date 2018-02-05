@@ -11,6 +11,7 @@ using namespace std;
 
 #define L 0.5
 
+
 //////// Utitlity FUnctions ////////
 
 // Generates Random Numbers from Exponential Distribution
@@ -30,6 +31,7 @@ int max(int a, int b)
     if(a > b) return a;
 	else return b;
 }
+
 
 //Checks if All the entries of a vector are zero or not
 bool Allzeros(vector<int> v)
@@ -61,6 +63,7 @@ int isIn( vector<int> v,int index)
 	}
 	return -1;
 }
+
 
 // Returns the process with minimum remaining burst time
 int minRem(vector<int> v,int index,vector<int> a)
@@ -131,7 +134,6 @@ double PremtiveSJF( vector<int> arrT, vector<int> BT)
 	
 	while(!Allzeros(remT))
 	{
-
 		index ++;
 		if(currProcess != -1)remT[currProcess] --;
 
@@ -240,7 +242,6 @@ int main()
     int N; 
     cout << "Enter number of process to run : ";
     cin >> N;
-
 	//FIle handling
 	ofstream myfile;
     myfile.open ("Processtables.txt",std::ios_base::app);
@@ -294,6 +295,7 @@ int main()
     cout << "AVG ATN rr1: " << avgrr1/10.0 << endl;
     cout << "AVG ATN rr2: " << avgrr2/10.0 << endl;
     cout << "AVG ATN rr5: " << avgrr5/10.0 << endl;
+
 	myfile.close();
     return 0 ;
 }

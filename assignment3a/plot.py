@@ -54,4 +54,3 @@ f.subplots_adjust(hspace=0.05)
 plt.setp([a.get_xticklabels() for a in f.axes[:-1]], visible=False)
 
 plt.show()
-
