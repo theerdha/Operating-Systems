@@ -38,8 +38,9 @@ int Allended()
 
 void * worker(void * index)
 {
+    srand(time(NULL));
     int index_int = *((int*) index);
-    cout << "Worker " << index_int << " active\n";
+    //cout << "Worker " << index_int << " active\n";
     vector <int> RandNos(5);
     for(int i = 0 ; i < RandNos.size(); i++)
     {
@@ -50,13 +51,13 @@ void * worker(void * index)
     sleep(rand() % 10 + 1);
     pthread_mutex_lock(&lock);
     status[index_int] = 2;
-    pthread_mutex_unlock(&lock);
     cout << "Sorted 1000 numbers in thread : " << index_int<< endl;
+    pthread_mutex_unlock(&lock);
     //<< *(int *)index << endl;
     pthread_exit(0);
 }
 
-void * reporter(void * param)
+void * reporter(void * sc)
 {
     printf("Reporter Active\n");
     /*while(!Allended(status))
@@ -73,15 +74,22 @@ void * reporter(void * param)
       change = 0;
       }
       } */
-    int i;
+    int i,last_kill = -1;
+    pthread_t scheduler = *((pthread_t*)sc);
     while((i = Allended()) != -2){
         pthread_mutex_lock(&lock);
         if(curr_thread != i){
-            if(curr_thread != -1 && i != -1)
+            if(curr_thread != -1 && i != -1 && status[curr_thread] != 2)
                 cout << "Context switched from thread " << curr_thread << " to thread " << i << endl; 
-            else if(i != -1)
+            else if((curr_thread == -1 && i != -1) || (curr_thread != -1 && i != -1 && status[curr_thread] == 2))
                 cout << "Running thread " << i << endl;
-            curr_thread = i;
+            else if(curr_thread != -1 && i == -1 && status[curr_thread] == 2 && last_kill != curr_thread){
+                cout << "Terminating thread " << curr_thread << endl;
+                last_kill = curr_thread;
+                pthread_kill(scheduler,SIGUSR2);
+            }
+            if(i != -1)
+                curr_thread = i;
         }
         pthread_mutex_unlock(&lock);
     }
@@ -186,11 +194,11 @@ int main()
         //cout << "here1" << endl;
         pthread_kill(mythreads[j],SIGUSR1);
     }
-    if(pthread_create(&rep,&attr,reporter,NULL) !=  0)
-        cerr << "Error creating thread\n";
     if(pthread_create(&sch,&attr,scheduler,(void *)&mythreads) !=  0)
         cerr << "Error creating thread\n";
-
+    
+    if(pthread_create(&rep,&attr,reporter,&sch) !=  0)
+        cerr << "Error creating thread\n";
     for(int j = 0; j < N; j++)
     {
         pthread_join(mythreads[j],NULL);
