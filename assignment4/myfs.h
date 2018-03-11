@@ -71,10 +71,14 @@ void initInode(inode* in){
     int i;
     time_t currenttime;
     struct tm* local_time;
+
+    in->filetype_permission[0] = 0x03; 
+    in->filetype_permission[1] = 0xFF; 
     currenttime = time(NULL);
     local_time = localtime(&currenttime);
     asctime_r(local_time, in->timeLastModified);
     asctime_r(local_time, in->timeLastRead);
+    in->file_size = 0;
     for(i = 0; i < 10; i++)
         in->dataList[i] = NULL;
 }
@@ -90,14 +94,14 @@ void syncSB(superblock* sb){
     myfs_ += sb->mask.disk_bitmask_size;
     bcopy(sb->mask.free_inode_bitmask,myfs_,sb->mask.inode_bitmask_size);
     myfs_ += sb->mask.inode_bitmask_size;
-    /*
+    
     printf("1. %d\n",*((int*)(myfs)));
     printf("2. %d\n",*((int*)(myfs+4)));
     printf("3. %d\n",*((int*)(myfs+8)));
     printf("4. %d\n",*((int*)(myfs+12)));
     printf("5. %d\n",*((int*)(myfs+16)));
     printf("6. %d\n",*((int*)(myfs+20)));
-    */
+    
     return;
 }
 
@@ -110,12 +114,12 @@ void syncInode(superblock* sb,inode* in,int index){
     myfs_ += (index + vfs.blocks_for_superblock)*sb->sb.blocksize;
     in_ = (inode*) myfs_;
     *in_ = *in;
-    /*
+    
     printf("Size of inode %d\n",sizeof(inode));
     printf("1. %d\n",*((int*)(myfs_)));
     printf("2. %d\n",*((int*)(myfs_+4)));
     printf("3. %d\n",*((char*)(myfs_+44)));
-    */
+    
     return;
 }
 
@@ -129,17 +133,12 @@ void syncdata(superblock* sb, datablock* db, int index){
     /*
     printf("1. %s\n",myfs_);
     printf("2. %d\n",*(unsigned int*)(myfs_+30));
+    printf("3. %s\n",myfs_ + 32);
+    printf("4. %d\n",*(unsigned int*)(myfs_+62));
     */
     return;
 }
 /*
-void update_inode_filesize(int size,int inode_no){
-    superblocksize sb;
-    load_super_block_data(&sb);
-    int* myfs_ = (int*)(myfs + (sb.max_inodes+ blocks_for_superblock + inode_no)*block_size );
-    *myfs_ = size;
-}
-
 int update_inode_datalist(int inode_no,int data_index){
     superblocksize sb;
     int vacant_datalist_index,i;
@@ -206,16 +205,9 @@ int create_myfs(int size,int max_inodes){
 
     // 2 bytes for access permission and file type d-rwx-rwx-rwx 9 bits so 2 bytes
     inode* in_temp = &vfs.inodeList[0];
-    in_temp->filetype_permission[0] = 0x03; 
-    in_temp->filetype_permission[1] = 0xFF; 
+    initInode(in_temp);
     in_temp->file_size = 32;
-    currenttime = time(NULL);
-    local_time = localtime(&currenttime);
-    asctime_r(local_time, in_temp->timeLastModified);
-    asctime_r(local_time, in_temp->timeLastRead);
     in_temp->dataList[0] = 0;
-    for(i = 1; i < 10; i++)
-        in_temp->dataList[i] = NULL;
     syncInode(&vfs.sb,in_temp,0);
     
     /* Initializing the root directory */
@@ -272,12 +264,30 @@ int getfreeindex(char* mask, int length){
     return free_index;
 }
 
+void insertDataIndex(inode* in,int index){
+
+}
+
+void insertFileInode(char* filename,int fileInode){
+   /*
+    inode* tempInode = vfs.inodeList[pwd_inode];
+    int index = tempInode.file_size/vfs.sb.sb.blocksize;
+    if(index < 8){
+        if(tempInode->dataList[index] != NULL){
+            strcpy(vfs.db[tempInode->dataList[index]] + tempInode.file_size/32 - (index-1)*32,filename);
+            tempInode->dataList[index].data + tempInode.file_size/32 - (index-1)*32 + 30;
+        }
+    }
+    */
+}
+
 int copy_pc2myfs(char* source,char* dest){
-    int inode_index;
+    int inode_index,n;
     int i, free_inode_index = 0,free_db_index,file_size;
     FILE* fd;
     char* myfs_ = myfs;
     struct stat st;
+    inode* tempInode;
     
     // Get file size
     stat(source,&st);
@@ -289,19 +299,23 @@ int copy_pc2myfs(char* source,char* dest){
         return -1;
     }
     free_inode_index = getfreeindex(vfs.sb.mask.free_inode_bitmask,vfs.sb.mask.inode_bitmask_size);
-    vfc.sb.sb.used_inodes += 1;
-
+    vfs.sb.sb.used_inodes += 1;
+    tempInode = &vfs.inodeList[free_inode_index] ;
+    initInode(tempInode);
     fd = fopen(source,"r");
     while(feof(fd) == 0){
         free_db_index = getfreeindex(vfs.sb.mask.free_disk_bitmask,vfs.sb.mask.disk_bitmask_size);
-        vfc.sb.sb.used_disk_blocks += 1;
-
+        n = fread(vfs.db[free_db_index].data,vfs.sb.sb.blocksize,1,fd);
+        printf("%s",vfs.db[free_db_index]);
+        syncdata(&vfs.sb,&vfs.db[free_db_index],free_db_index);
+        vfs.sb.sb.used_disk_blocks += 1;
+        tempInode->file_size += vfs.sb.sb.blocksize;
+        insertDataIndex(tempInode,free_db_index); // TODO
     }
+    insertFileInode(dest,free_inode_index);
+    syncInode(&vfs.sb,tempInode,free_inode_index); // TODO
+    syncSB(&vfs.sb);
 
-    // Update the superblock
-    printf("Free inode index %d\n",free_inode_index);
-    printf("Free db index %d\n",free_db_index);
-    
     return 1;
 }
 
