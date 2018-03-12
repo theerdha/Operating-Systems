@@ -31,7 +31,7 @@ typedef struct superblock{
 // Data structure of inode
 typedef struct inode{
     int file_size;
-    int dataList[10];
+    int dataList[8];
     char filetype_permission[2];
     char timeLastModified[26];
     char timeLastRead[26];
@@ -94,14 +94,14 @@ void syncSB(superblock* sb){
     myfs_ += sb->mask.disk_bitmask_size;
     bcopy(sb->mask.free_inode_bitmask,myfs_,sb->mask.inode_bitmask_size);
     myfs_ += sb->mask.inode_bitmask_size;
-    
+    /*
     printf("1. %d\n",*((int*)(myfs)));
     printf("2. %d\n",*((int*)(myfs+4)));
     printf("3. %d\n",*((int*)(myfs+8)));
     printf("4. %d\n",*((int*)(myfs+12)));
     printf("5. %d\n",*((int*)(myfs+16)));
     printf("6. %d\n",*((int*)(myfs+20)));
-    
+    */
     return;
 }
 
@@ -114,12 +114,12 @@ void syncInode(superblock* sb,inode* in,int index){
     myfs_ += (index + vfs.blocks_for_superblock)*sb->sb.blocksize;
     in_ = (inode*) myfs_;
     *in_ = *in;
-    
+    /*
     printf("Size of inode %d\n",sizeof(inode));
     printf("1. %d\n",*((int*)(myfs_)));
     printf("2. %d\n",*((int*)(myfs_+4)));
     printf("3. %d\n",*((char*)(myfs_+44)));
-    
+    */
     return;
 }
 
@@ -138,24 +138,7 @@ void syncdata(superblock* sb, datablock* db, int index){
     */
     return;
 }
-/*
-int update_inode_datalist(int inode_no,int data_index){
-    superblocksize sb;
-    int vacant_datalist_index,i;
-    load_super_block_data(&sb);
-    int* myfs_ = (int*)(myfs + (sb.max_inodes+ blocks_for_superblock + inode_no)*block_size + 58);
-    // Update in direct list
-    for(i = 0; i < 8; i++){
-        if(*myfs_ != NULL){
-            *myfs_ = data_index;
-            return 1;
-        }
-        myfs_ += 1;
-    }
-    // update in indirect list
-    // Check is indirect llist is already made. If not create an indirect list and find empty data block and assign 
-}
-*/
+
 // Assuming the system to be byte addressable
 int create_myfs(int size,int max_inodes){
     // Size is measured in Mbytes
@@ -220,9 +203,8 @@ int create_myfs(int size,int max_inodes){
 
 int getfreeindex(char* mask, int length){
     int i, free_index = 0;
-
     for(i = 0; i < length; i++){
-        if( !(mask[i] ^ 0xFF)){
+        if( mask[i] == (char)0xFF ){
             free_index += 8;
         }
         else{
@@ -257,7 +239,7 @@ int getfreeindex(char* mask, int length){
             else if(!(mask[i] & 0x01)){
                 mask[i] = mask[i] | 0x01;
                 free_index += 7;
-            } 
+            }
             break;
         }    
     }
@@ -269,16 +251,58 @@ void insertDataIndex(inode* in,int index){
 }
 
 void insertFileInode(char* filename,int fileInode){
-   /*
-    inode* tempInode = vfs.inodeList[pwd_inode];
-    int index = tempInode.file_size/vfs.sb.sb.blocksize;
+    inode* tempInode = &vfs.inodeList[pwd_inode];
+    int filesize = tempInode->file_size;
+    int index = tempInode->file_size/vfs.sb.sb.blocksize;
+    int dIndex = tempInode->dataList[index];
+    int offset, free_db_index;
+    short* n;
     if(index < 8){
-        if(tempInode->dataList[index] != NULL){
-            strcpy(vfs.db[tempInode->dataList[index]] + tempInode.file_size/32 - (index-1)*32,filename);
-            tempInode->dataList[index].data + tempInode.file_size/32 - (index-1)*32 + 30;
+        if(dIndex != NULL){
+            offset = tempInode->file_size - ((index >= 1)?((index-1)*vfs.sb.sb.blocksize):0);
+            strcpy(vfs.db[dIndex].data + offset,filename);
+            n = (short*) vfs.db[dIndex].data + offset + 30;
+            *n = (short) fileInode;
+            syncdata(&vfs.sb,&vfs.db[dIndex],dIndex);
+        }
+        else{
+            if(vfs.sb.sb.max_disk_blocks - vfs.sb.sb.used_disk_blocks  == 0){
+                fprintf(stderr,"Insufficient disk space for stroring directory entry.\n");
+            }
+            dIndex = getfreeindex(vfs.sb.mask.free_disk_bitmask,vfs.sb.mask.disk_bitmask_size);
+            tempInode->dataList[index] = dIndex;
+            strcpy(vfs.db[dIndex].data,filename);
+            n = (short*) vfs.db[dIndex].data + 30;
+            *n = (short) fileInode;
+            syncdata(&vfs.sb,&vfs.db[dIndex],dIndex);
+            syncSB(&vfs.sb);
         }
     }
-    */
+    else{
+
+    }
+    tempInode->file_size += 32;
+    syncInode(&vfs.sb,tempInode,pwd_inode);
+    return;
+}
+
+int ls_myfs(){
+    inode* inodeTemp = &vfs.inodeList[pwd_inode];
+    int filesize = inodeTemp->file_size,index = 0,offset = 0,dIndex;
+    printf("data %d\n",inodeTemp->dataList[0]);
+    while(filesize != 0){
+        if(index < 8){
+            dIndex = inodeTemp->dataList[index];
+            printf("%s %d\n",vfs.db[dIndex].data+offset,*((short*)(vfs.db[dIndex].data+offset+30)));
+            filesize -= 32;
+            offset += 32;
+            if(offset == vfs.sb.sb.blocksize){
+                offset = 0;
+                index += 1;
+            }
+        }
+    }
+    return 1;
 }
 
 int copy_pc2myfs(char* source,char* dest){
@@ -295,7 +319,7 @@ int copy_pc2myfs(char* source,char* dest){
      
     // Check disk space availability
     if((ceil(double(file_size)/vfs.sb.sb.blocksize) > vfs.sb.sb.max_disk_blocks - vfs.sb.sb.used_disk_blocks) && vfs.sb.sb.max_inodes - vfs.sb.sb.used_inodes >= 1){
-        fprintf(stderr,"Insufficient disk space\n");
+        fprintf(stderr,"Insufficient disk space for data.\n");
         return -1;
     }
     free_inode_index = getfreeindex(vfs.sb.mask.free_inode_bitmask,vfs.sb.mask.inode_bitmask_size);
@@ -306,7 +330,8 @@ int copy_pc2myfs(char* source,char* dest){
     while(feof(fd) == 0){
         free_db_index = getfreeindex(vfs.sb.mask.free_disk_bitmask,vfs.sb.mask.disk_bitmask_size);
         n = fread(vfs.db[free_db_index].data,vfs.sb.sb.blocksize,1,fd);
-        printf("%s",vfs.db[free_db_index]);
+        //printf("Free DB INDEX%d\n",free_db_index);
+        //printf("%s",vfs.db[free_db_index]);
         syncdata(&vfs.sb,&vfs.db[free_db_index],free_db_index);
         vfs.sb.sb.used_disk_blocks += 1;
         tempInode->file_size += vfs.sb.sb.blocksize;
@@ -315,14 +340,9 @@ int copy_pc2myfs(char* source,char* dest){
     insertFileInode(dest,free_inode_index);
     syncInode(&vfs.sb,tempInode,free_inode_index); // TODO
     syncSB(&vfs.sb);
-
+    ls_myfs();
+    fclose(fd);
     return 1;
 }
 
-/*
-   int ls_myfs(){
-   for(int i = 0; i < 10; i++){
 
-   }
-   }
-   */
