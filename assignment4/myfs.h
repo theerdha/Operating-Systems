@@ -273,8 +273,9 @@ void insertFileInode(char* filename,int fileInode){
     inode* tempInode = &vfs.inodeList[pwd_inode];
     int filesize = tempInode->file_size;
     int index = tempInode->file_size/vfs.sb.sb.blocksize;
-    int dIndex = tempInode->dataList[index];
+    int dIndex = tempInode->dataList[index], dIndex_;
     int offset, free_db_index;
+    int* x;
     short* n;
     if(index < 8){
         if(tempInode->file_size%256 != 0){
@@ -285,17 +286,41 @@ void insertFileInode(char* filename,int fileInode){
             syncdata(&vfs.sb,&vfs.db[dIndex],dIndex);
         }
         else{
-            if(vfs.sb.sb.max_disk_blocks - vfs.sb.sb.used_disk_blocks  == 0){
-                fprintf(stderr,"Insufficient disk space for stroring directory entry.\n");
-            }
             dIndex = getfreeindex(vfs.sb.mask.free_disk_bitmask,vfs.sb.mask.disk_bitmask_size);
             tempInode->dataList[index] = dIndex;
-            strcpy(vfs.db[dIndex].data,filename);
-            n = (short*) vfs.db[dIndex].data + 30;
+            strcpy(vfs.db[dIndex].data ,filename);
+            n = (short*) (vfs.db[dIndex].data + 30);
             *n = (short) fileInode;
             syncdata(&vfs.sb,&vfs.db[dIndex],dIndex);
-            syncSB(&vfs.sb);
         }
+    }
+    else if(index < 64){
+        if(vfs.sb.sb.max_disk_blocks - vfs.sb.sb.used_disk_blocks  == 0){
+            fprintf(stderr,"Insufficient disk space for stroring directory entry.\n");
+        }
+        if(index == 8){
+            dIndex = getfreeindex(vfs.sb.mask.free_disk_bitmask,vfs.sb.mask.disk_bitmask_size);
+            tempInode->dataList[index] = dIndex;
+        }
+        offset = tempInode->file_size - index*vfs.sb.sb.blocksize;
+        dIndex = tempInode->dataList[8];
+        
+        if(tempInode->file_size%256 == 0){
+            offset = 0;
+            dIndex_ = getfreeindex(vfs.sb.mask.free_disk_bitmask,vfs.sb.mask.disk_bitmask_size);
+            x = (int*) (vfs.db[dIndex].data + (index-8)*4);
+            *x = dIndex_;
+        }
+        else{
+            x = (int*)(vfs.db[dIndex].data + (index-8)*4);
+            dIndex_ = *x;
+        }
+        strcpy(vfs.db[dIndex_].data + offset,filename);
+        n = (short*) (vfs.db[dIndex_].data + offset + 30);
+        *n = (short) fileInode;
+        syncdata(&vfs.sb,&vfs.db[dIndex],dIndex);
+        syncdata(&vfs.sb,&vfs.db[dIndex_],dIndex_);
+        syncSB(&vfs.sb);
     }
     else{
 
@@ -324,6 +349,7 @@ int ls_myfs(){
     }
     return 1;
 }
+
 
 int copy_pc2myfs(char* source,char* dest){
     int inode_index,n;
