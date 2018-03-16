@@ -308,7 +308,7 @@ void insertFileInode(char* filename,int fileInode){
         }
     }
     else if(index < 72){
-        if(index == 8 tempInode->file_size%256 == 0){
+        if(index == 8 && tempInode->file_size%256 == 0){
             dIndex = getfreeindex(vfs.sb.mask.free_disk_bitmask,vfs.sb.mask.disk_bitmask_size);
             tempInode->dataList[8] = dIndex;
             dIndex_1 = getfreeindex(vfs.sb.mask.free_disk_bitmask,vfs.sb.mask.disk_bitmask_size);
@@ -317,7 +317,7 @@ void insertFileInode(char* filename,int fileInode){
             offset = 0;
         }
         else if(index > 8 && tempInode->file_size%256 == 0){
-            dIndex = temp->dataList[8];
+            dIndex = tempInode->dataList[8];
             dIndex_1 = getfreeindex(vfs.sb.mask.free_disk_bitmask,vfs.sb.mask.disk_bitmask_size);
             x = (int*) (vfs.db[dIndex].data + (index-8)*4);
             *x = dIndex_1;
@@ -369,7 +369,7 @@ void insertFileInode(char* filename,int fileInode){
                 dIndex = tempInode->dataList[9];
                 dIndex_1 = *((int*)(vfs.db[dIndex].data + offset));
                 dIndex_2 = getfreeindex(vfs.sb.mask.free_disk_bitmask,vfs.sb.mask.disk_bitmask_size);
-                x = (int*)(vfs.db[dIndex_1] + offset1);
+                x = (int*)(vfs.db[dIndex_1].data + offset1);
                 *x = dIndex_2;
             }
         }
@@ -378,8 +378,8 @@ void insertFileInode(char* filename,int fileInode){
             offset = (index-8)/64;
             offset1 = (index-8)%64;
             offset2 = filesize%vfs.sb.sb.blocksize;
-            dIndex_1 = *((int*)(vfs.db[dIndex]+offset));
-            dIndex_2 = *((int*)(vfs.db[dIndex_1]+offset1));
+            dIndex_1 = *((int*)(vfs.db[dIndex].data +offset));
+            dIndex_2 = *((int*)(vfs.db[dIndex_1].data +offset1));
         }
         strcpy(vfs.db[dIndex_2].data + offset2,filename);
         n = (short*) (vfs.db[dIndex_2].data + offset2 + 30);
