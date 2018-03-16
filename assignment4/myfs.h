@@ -247,13 +247,13 @@ int getfreeindex(char* mask, int length){
 }
 
 void insertDataIndex(inode* in,int dIndex){
-    int filesize = in->file_size,di,free_db_index;
+    int filesize = in->file_size,di,free_db_index,di_2;
     int index = ceil(filesize/vfs.sb.sb.blocksize);
     int* x;
     if(index < 8){
         in->dataList[index] = dIndex;
     }
-    else if(index < 64){
+    else if(index < 72){
         if (index == 8){
             free_db_index = getfreeindex(vfs.sb.mask.free_disk_bitmask,vfs.sb.mask.disk_bitmask_size);
             in->dataList[8] = free_db_index;
@@ -264,7 +264,19 @@ void insertDataIndex(inode* in,int dIndex){
         syncdata(&vfs.sb,&vfs.db[di],di);
     }
     else{
-
+        if(index == 72){
+            free_db_index = getfreeindex(vfs.sb.mask.free_disk_bitmask,vfs.sb.mask.disk_bitmask_size);
+            in->dataList[9] = free_db_index;
+            free_db_index = getfreeindex(vfs.sb.mask.free_disk_bitmask,vfs.sb.mask.disk_bitmask_size);
+            x = (int*) (vfs.db[*((int*)(vfs.db[in->dataList[9]].data))].data);
+            *x = free_db_index;
+        }
+        di = in->dataList[9];
+        di_2 = *((int*)(vfs.db[di].data + ((index-72)/64)*4));
+        x = (int*)(in->dataList[di_2] + ((index-72)%64)*4);
+        *x = dIndex;
+        syncdata(&vfs.sb,&vfs.db[di],di);
+        syncdata(&vfs.sb,&vfs.db[di_2],di_2);
     }
     return;
 }
@@ -273,13 +285,14 @@ void insertFileInode(char* filename,int fileInode){
     inode* tempInode = &vfs.inodeList[pwd_inode];
     int filesize = tempInode->file_size;
     int index = tempInode->file_size/vfs.sb.sb.blocksize;
-    int dIndex = tempInode->dataList[index], dIndex_;
-    int offset, free_db_index;
+    int dIndex, dIndex_1, dIndex_2;
+    int offset, offset1, offset2, free_db_index;
     int* x;
     short* n;
     if(index < 8){
+        dIndex = tempInode->dataList[index];
         if(tempInode->file_size%256 != 0){
-            offset = tempInode->file_size - ((index >= 1)?((index-1)*vfs.sb.sb.blocksize):0);
+            offset = tempInode->file_size - index*vfs.sb.sb.blocksize;
             strcpy(vfs.db[dIndex].data + offset,filename);
             n = (short*) (vfs.db[dIndex].data + offset + 30);
             *n = (short) fileInode;
@@ -294,39 +307,88 @@ void insertFileInode(char* filename,int fileInode){
             syncdata(&vfs.sb,&vfs.db[dIndex],dIndex);
         }
     }
-    else if(index < 64){
-        if(vfs.sb.sb.max_disk_blocks - vfs.sb.sb.used_disk_blocks  == 0){
-            fprintf(stderr,"Insufficient disk space for stroring directory entry.\n");
-        }
-        if(index == 8){
+    else if(index < 72){
+        if(index == 8 tempInode->file_size%256 == 0){
             dIndex = getfreeindex(vfs.sb.mask.free_disk_bitmask,vfs.sb.mask.disk_bitmask_size);
-            tempInode->dataList[index] = dIndex;
-        }
-        offset = tempInode->file_size - index*vfs.sb.sb.blocksize;
-        dIndex = tempInode->dataList[8];
-        
-        if(tempInode->file_size%256 == 0){
-            offset = 0;
-            dIndex_ = getfreeindex(vfs.sb.mask.free_disk_bitmask,vfs.sb.mask.disk_bitmask_size);
+            tempInode->dataList[8] = dIndex;
+            dIndex_1 = getfreeindex(vfs.sb.mask.free_disk_bitmask,vfs.sb.mask.disk_bitmask_size);
             x = (int*) (vfs.db[dIndex].data + (index-8)*4);
-            *x = dIndex_;
+            *x = dIndex_1;
+            offset = 0;
+        }
+        else if(index > 8 && tempInode->file_size%256 == 0){
+            dIndex = temp->dataList[8];
+            dIndex_1 = getfreeindex(vfs.sb.mask.free_disk_bitmask,vfs.sb.mask.disk_bitmask_size);
+            x = (int*) (vfs.db[dIndex].data + (index-8)*4);
+            *x = dIndex_1;
+            offset = 0;
         }
         else{
+            offset = tempInode->file_size%vfs.sb.sb.blocksize;
+            dIndex = tempInode->dataList[8];
             x = (int*)(vfs.db[dIndex].data + (index-8)*4);
-            dIndex_ = *x;
+            dIndex_1 = *x;
         }
-        strcpy(vfs.db[dIndex_].data + offset,filename);
-        n = (short*) (vfs.db[dIndex_].data + offset + 30);
+        strcpy(vfs.db[dIndex_1].data + offset,filename);
+        n = (short*) (vfs.db[dIndex_1].data + offset + 30);
         *n = (short) fileInode;
         syncdata(&vfs.sb,&vfs.db[dIndex],dIndex);
-        syncdata(&vfs.sb,&vfs.db[dIndex_],dIndex_);
-        syncSB(&vfs.sb);
+        syncdata(&vfs.sb,&vfs.db[dIndex_1],dIndex_1);
     }
     else{
-
+        if(index == 72 && filesize%256 == 0){
+            dIndex = getfreeindex(vfs.sb.mask.free_disk_bitmask,vfs.sb.mask.disk_bitmask_size);
+            tempInode->dataList[9] = dIndex;
+            x = (int*)(vfs.db[dIndex].data);
+            dIndex_1 = getfreeindex(vfs.sb.mask.free_disk_bitmask,vfs.sb.mask.disk_bitmask_size);
+            *x = dIndex_1;
+            dIndex_2 = getfreeindex(vfs.sb.mask.free_disk_bitmask,vfs.sb.mask.disk_bitmask_size);
+            x = (int*)(vfs.db[dIndex_1].data);
+            *x = dIndex_2;
+            offset = 0;
+            offset1 = 0;
+            offset2 = 0;
+        }
+        else if(index > 72 && filesize%256 == 0 ){
+            if((index-8)%64 == 0){
+                offset = (index-8)/64;
+                offset1 = 0;
+                offset2 = 0;
+                dIndex = tempInode->dataList[9];
+                dIndex_1 = getfreeindex(vfs.sb.mask.free_disk_bitmask,vfs.sb.mask.disk_bitmask_size);
+                x = (int*)(vfs.db[dIndex].data+offset);
+                *x = dIndex_1;
+                dIndex_2 = getfreeindex(vfs.sb.mask.free_disk_bitmask,vfs.sb.mask.disk_bitmask_size);
+                x = (int*)(vfs.db[dIndex_1].data+offset1);
+                *x = dIndex_2;
+            }
+            else{
+                offset = (index-8)/64;
+                offset1 = (index-8)%64;
+                offset2 = 0;
+                dIndex = tempInode->dataList[9];
+                dIndex_1 = *((int*)(vfs.db[dIndex].data + offset));
+                dIndex_2 = getfreeindex(vfs.sb.mask.free_disk_bitmask,vfs.sb.mask.disk_bitmask_size);
+                x = (int*)(vfs.db[dIndex_1] + offset1);
+                *x = dIndex_2;
+            }
+        }
+        else{
+            dIndex = tempInode->dataList[9];
+            offset = (index-8)/64;
+            offset1 = (index-8)%64;
+            offset2 = filesize%vfs.sb.sb.blocksize;
+            dIndex_1 = *((int*)(vfs.db[dIndex]+offset));
+            dIndex_2 = *((int*)(vfs.db[dIndex_1]+offset1));
+        }
+        strcpy(vfs.db[dIndex_2].data + offset2,filename);
+        n = (short*) (vfs.db[dIndex_2].data + offset2 + 30);
+        *n = (short) fileInode;
+        syncdata(&vfs.sb,&vfs.db[dIndex],dIndex);
+        syncdata(&vfs.sb,&vfs.db[dIndex_1],dIndex_1);
+        syncdata(&vfs.sb,&vfs.db[dIndex_2],dIndex_2);
     }
     tempInode->file_size += 32;
-    syncInode(&vfs.sb,tempInode,pwd_inode);
     return;
 }
 
@@ -386,6 +448,7 @@ int copy_pc2myfs(char* source,char* dest){
     //printf("File size : %d\n",tempInode->file_size);
     insertFileInode(dest,free_inode_index);
     syncInode(&vfs.sb,tempInode,free_inode_index); 
+    syncInode(&vfs.sb,&vfs.inodeList[pwd_inode],pwd_inode);
     syncSB(&vfs.sb);
     fclose(fd);
     /*
