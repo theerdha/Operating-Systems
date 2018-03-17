@@ -19,7 +19,12 @@ int main(){
     copy_pc2myfs("myfs.h","myfs10.h");
     copy_pc2myfs("myfs.h","myfs11.h");
     copy_pc2myfs("test.cpp","test.cpp");
+    copy_myfs2pc("test.cpp","test1.cpp");
+    mkdir_myfs("buridi");
     showfile_myfs("myfs1.h");
+    chdir_myfs("buridi");
+    ls_myfs();
+    chdir_myfs("..");
     ls_myfs();
     return 0;
 }

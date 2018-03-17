@@ -659,3 +659,12 @@ int mkdir_myfs(char* dirname){
     syncSB(&vfs.sb);
     return 1;
 }
+
+int chdir_myfs(char* dirname){
+    int fileInode = getfilename_inode(dirname);
+    printf("\n#####Changing directory to Inode %d with file Name %s#######\n", fileInode,dirname);
+    if(fileInode == -1)
+        return -1;
+    pwd_inode = fileInode;
+    return 1;
+}
