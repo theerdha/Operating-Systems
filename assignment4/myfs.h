@@ -186,7 +186,7 @@ int create_myfs(int size,int max_inodes){
 
     /* Initializing Root Inode and setting other inodes to null*/
 
-    // 2 bytes for access permission and file type d-rwx-rwx-rwx 9 bits so 2 bytes
+    // 2 bytes for access permission and file type d-rwx-rwx-rwx 10 bits so 2 bytes
     inode* in_temp = &vfs.inodeList[0];
     initInode(in_temp);
     in_temp->file_size = 32;
@@ -282,8 +282,8 @@ void insertDataIndex(inode* in,int dIndex){
     return;
 }
 
-void insertFileInode(char* filename,int fileInode){
-    inode* tempInode = &vfs.inodeList[pwd_inode];
+void insertFileInode(int pwd_inode_,char* filename,int fileInode){
+    inode* tempInode = &vfs.inodeList[pwd_inode_];
     int filesize = tempInode->file_size;
     int index = tempInode->file_size/vfs.sb.sb.blocksize;
     int dIndex, dIndex_1, dIndex_2;
@@ -573,8 +573,9 @@ int copy_pc2myfs(char* source,char* dest){
     }
     free_inode_index = getfreeindex(vfs.sb.mask.free_inode_bitmask,vfs.sb.mask.inode_bitmask_size);
     vfs.sb.sb.used_inodes += 1;
-    tempInode = &vfs.inodeList[free_inode_index] ;
+    tempInode = &vfs.inodeList[free_inode_index];
     initInode(tempInode);
+    tempInode->filetype_permission[0] = 0x01; 
     fd = fopen(source,"r");
     while(feof(fd) == 0){
         free_db_index = getfreeindex(vfs.sb.mask.free_disk_bitmask,vfs.sb.mask.disk_bitmask_size);
@@ -588,7 +589,7 @@ int copy_pc2myfs(char* source,char* dest){
         tempInode->file_size += n+1;
     }
     //printf("File size : %d\n",tempInode->file_size);
-    insertFileInode(dest,free_inode_index);
+    insertFileInode(pwd_inode,dest,free_inode_index);
     syncInode(&vfs.sb,tempInode,free_inode_index); 
     syncInode(&vfs.sb,&vfs.inodeList[pwd_inode],pwd_inode);
     syncSB(&vfs.sb);
@@ -598,5 +599,63 @@ int copy_pc2myfs(char* source,char* dest){
     printf("%s %d\n",vfs.db[0].data+32,*((short*)(vfs.db[0].data+32+30)));
     printf("%s %d\n",vfs.db[0].data+64,*((short*)(vfs.db[0].data+64+30)));
     */
+    return 1;
+}
+
+int copy_myfs2pc(char* source, char* dest){
+    FILE* fd = fopen(dest,"w+");
+    int index = 0, dIndex, dIndex_1, dIndex_2;
+    int fileInode = getfilename_inode(source);
+    printf("\n#####Copying File Inode %d with file Name %s#######\n", fileInode,source);
+    if(fileInode == -1)
+        return -1;
+    inode* inodeTemp = &vfs.inodeList[fileInode];
+    int index_count = ceil(double(inodeTemp->file_size)/vfs.sb.sb.blocksize);
+    //printf("Max inodes to get %d\n",index_count);
+    
+    while(index < index_count){
+        //printf("<<<<<<<<<<<<<<<Showing Index %d",index);
+        if(index < 8){
+            dIndex = inodeTemp->dataList[index];
+            //printf("<<<<<<<<<<<<<<<Showing Index %d\n",dIndex);
+            fwrite(vfs.db[dIndex].data,1,strlen(vfs.db[dIndex].data),fd);
+            index++;
+        }
+        else if(index < 72){
+            dIndex = inodeTemp->dataList[8];
+            dIndex_1 = *((int*)(vfs.db[dIndex].data + (index-8)*4));
+            //printf("<<<<<<<<<<<<<<<Showing Index %d\n",dIndex_1);
+            fwrite(vfs.db[dIndex_1].data,1,strlen(vfs.db[dIndex_1].data),fd);
+            index++;
+        }
+        else{
+            dIndex = inodeTemp->dataList[9];
+            dIndex_1 = *((int*)(vfs.db[dIndex].data + ((index-72)/64)*4));
+            dIndex_2 = *((int*)(vfs.db[dIndex_1].data + ((index-72)%64)*4));
+            //printf("<<<<<<<<<<<<<<<Showing Index %d\n",dIndex_2);
+            fwrite(vfs.db[dIndex_2].data,1,strlen(vfs.db[dIndex_2].data),fd);
+            index++;
+        }
+    }
+    fclose(fd);
+    return 1;
+}
+
+int mkdir_myfs(char* dirname){
+    int free_inode_index;
+    inode* tempInode;
+    if((1 > vfs.sb.sb.max_disk_blocks - vfs.sb.sb.used_disk_blocks) && vfs.sb.sb.max_inodes - vfs.sb.sb.used_inodes >= 1){
+        fprintf(stderr,"Insufficient disk space for data.\n");
+        return -1;
+    }
+    free_inode_index = getfreeindex(vfs.sb.mask.free_inode_bitmask,vfs.sb.mask.inode_bitmask_size);
+    tempInode = &vfs.inodeList[free_inode_index];
+    initInode(tempInode);
+    insertFileInode(free_inode_index,".",free_inode_index);
+    insertFileInode(free_inode_index,"..",pwd_inode);
+    insertFileInode(pwd_inode, dirname,free_inode_index);
+    syncInode(&vfs.sb,tempInode,free_inode_index); 
+    syncInode(&vfs.sb,&vfs.inodeList[pwd_inode],pwd_inode);
+    syncSB(&vfs.sb);
     return 1;
 }
