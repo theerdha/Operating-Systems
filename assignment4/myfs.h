@@ -201,8 +201,19 @@ int create_myfs(int size,int max_inodes){
     return 1;
 }
 
+void myfs_info(){
+    printf("\n######## File System Info #########\nCreated superblock with %d blocks\n", vfs.blocks_for_superblock);
+    printf("Blocks left in inode list with %d blocks\n", vfs.sb.sb.max_inodes - vfs.sb.sb.used_inodes);
+    printf("Blocks left in Data blocks with %d blocks\n", vfs.sb.sb.max_disk_blocks - vfs.sb.sb.used_disk_blocks);
+}
+
 int getfreeindex(char* mask, int length){
     int i, free_index = 0;
+    if(length == ceil(double(vfs.blocks_for_inodelist)/8))
+        vfs.sb.sb.used_inodes += 1;
+    else if(length == ceil(double(vfs.blocks_for_datablocks)/8))
+        vfs.sb.sb.used_disk_blocks += 1;
+
     for(i = 0; i < length; i++){
         if( mask[i] == (char)0xFF ){
             free_index += 8;
@@ -447,6 +458,12 @@ int getfilename_inode(char* filename){
 }
 
 void restore_index(char* bitmask,int bitmask_size,int index){
+
+    if(bitmask_size == ceil(double(vfs.blocks_for_inodelist)/8))
+        vfs.sb.sb.used_inodes -= 1;
+    else if(bitmask_size == ceil(double(vfs.blocks_for_datablocks)/8))
+        vfs.sb.sb.used_disk_blocks -= 1;
+
     char* pointer = bitmask + (index/8);
     if(index%8 == 0)
         *pointer = *pointer & (~(0x80));
@@ -470,6 +487,7 @@ void restore_index(char* bitmask,int bitmask_size,int index){
 int ls_myfs(){
     inode* inodeTemp = &vfs.inodeList[pwd_inode];
     int filesize = inodeTemp->file_size,index = 0,offset = 0,dIndex, dIndex_1, dIndex_2, fileIndex;    
+    printf("\n#####Listing current directory #######\n");
     //printf("FILESIZE %d\n",filesize);
     while(filesize != 0){
         if(index < 8){
@@ -571,8 +589,7 @@ int copy_pc2myfs(char* source,char* dest){
         fprintf(stderr,"Insufficient disk space for data.\n");
         return -1;
     }
-    free_inode_index = getfreeindex(vfs.sb.mask.free_inode_bitmask,vfs.sb.mask.inode_bitmask_size);
-    vfs.sb.sb.used_inodes += 1;
+    free_inode_index = getfreeindex(vfs.sb.mask.free_inode_bitmask,vfs.sb.mask.inode_bitmask_size);   
     tempInode = &vfs.inodeList[free_inode_index];
     initInode(tempInode);
     tempInode->filetype_permission[0] = 0x01; 
@@ -584,7 +601,6 @@ int copy_pc2myfs(char* source,char* dest){
         //printf("Free DB INDEX%d\n",free_db_index);
         //printf("%s",vfs.db[free_db_index]);
         syncdata(&vfs.sb,&vfs.db[free_db_index],free_db_index);
-        vfs.sb.sb.used_disk_blocks += 1;
         insertDataIndex(tempInode,free_db_index); 
         tempInode->file_size += n+1;
     }
@@ -668,3 +684,4 @@ int chdir_myfs(char* dirname){
     pwd_inode = fileInode;
     return 1;
 }
+
