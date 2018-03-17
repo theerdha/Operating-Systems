@@ -159,7 +159,7 @@ int create_myfs(int size,int max_inodes){
     vfs.inodeList = (inode*)malloc(sizeof(inode)*max_inodes);
     vfs.blocks_for_inodelist = max_inodes; 
     no_of_data_blocks = (size*1024*4 - max_inodes);
-    vfs.blocks_for_datablocks = no_of_data_blocks - ceil(no_of_data_blocks/(8*vfs.sb.sb.blocksize) + max_inodes/8 + double(20)/vfs.sb.sb.blocksize);
+    vfs.blocks_for_datablocks = no_of_data_blocks - ceil(double(no_of_data_blocks)/(8*vfs.sb.sb.blocksize) + max_inodes/8 + double(20)/vfs.sb.sb.blocksize);
     vfs.blocks_for_superblock = size*1024*4 - vfs.blocks_for_datablocks - vfs.blocks_for_inodelist;
     vfs.db = (datablock*) malloc(sizeof(datablock)*no_of_data_blocks);
     myfs_ = myfs;
@@ -248,7 +248,8 @@ int getfreeindex(char* mask, int length){
 
 void insertDataIndex(inode* in,int dIndex){
     int filesize = in->file_size,di,free_db_index,di_2;
-    int index = ceil(filesize/vfs.sb.sb.blocksize);
+    int index = ceil(double(filesize)/vfs.sb.sb.blocksize);
+    //printf("Location to be inserted %d\n", dIndex);
     int* x;
     if(index < 8){
         in->dataList[index] = dIndex;
@@ -265,15 +266,15 @@ void insertDataIndex(inode* in,int dIndex){
     }
     else{
         if(index == 72){
-            free_db_index = getfreeindex(vfs.sb.mask.free_disk_bitmask,vfs.sb.mask.disk_bitmask_size);
-            in->dataList[9] = free_db_index;
-            free_db_index = getfreeindex(vfs.sb.mask.free_disk_bitmask,vfs.sb.mask.disk_bitmask_size);
-            x = (int*) (vfs.db[*((int*)(vfs.db[in->dataList[9]].data))].data);
-            *x = free_db_index;
+            di = getfreeindex(vfs.sb.mask.free_disk_bitmask,vfs.sb.mask.disk_bitmask_size);
+            in->dataList[9] = di;
+            di_2 = getfreeindex(vfs.sb.mask.free_disk_bitmask,vfs.sb.mask.disk_bitmask_size);
+            x = (int*) (vfs.db[di].data);
+            *x = di_2;
         }
         di = in->dataList[9];
         di_2 = *((int*)(vfs.db[di].data + ((index-72)/64)*4));
-        x = (int*)(in->dataList[di_2] + ((index-72)%64)*4);
+        x = (int*)(vfs.db[di_2].data + ((index-72)%64)*4);
         *x = dIndex;
         syncdata(&vfs.sb,&vfs.db[di],di);
         syncdata(&vfs.sb,&vfs.db[di_2],di_2);
@@ -392,6 +393,80 @@ void insertFileInode(char* filename,int fileInode){
     return;
 }
 
+int getfilename_inode(char* filename){
+    inode* inodeTemp = &vfs.inodeList[pwd_inode];
+    int filesize = inodeTemp->file_size,index = 0,offset = 0,dIndex, dIndex_1, dIndex_2, fileIndex;   
+    while(filesize != 0){
+        if(index < 8){
+            dIndex = inodeTemp->dataList[index];
+            fileIndex = *((short*)(vfs.db[dIndex].data+offset+30));
+            if(strcmp(vfs.db[dIndex].data+offset,filename) == 0){
+                return fileIndex;
+            }
+            //printf("%s %dB\n",vfs.db[dIndex].data+offset,vfs.inodeList[fileIndex].file_size);
+            filesize -= 32;
+            offset += 32;
+            if(offset == vfs.sb.sb.blocksize){
+                offset = 0;
+                index += 1;
+            }
+        }
+        else if(index < 72){
+            dIndex = inodeTemp->dataList[8];
+            dIndex_1 = *((int*)(vfs.db[dIndex].data + (index-8)*4 ));
+            fileIndex = *((short*)(vfs.db[dIndex_1].data + offset + 30));
+            if(strcmp(vfs.db[dIndex].data+offset,filename) == 0){
+                return fileIndex;
+            }
+            //printf("%s %dB\n",vfs.db[dIndex_1].data+offset,vfs.inodeList[fileIndex].file_size);
+            filesize -= 32;
+            offset += 32;
+            if(offset == vfs.sb.sb.blocksize){
+                offset = 0;
+                index += 1;
+            }
+        }
+        else{
+            dIndex = inodeTemp->dataList[9];
+            dIndex_1 = *((int*)(vfs.db[dIndex].data + ((index-72)/64)*4 ));
+            dIndex_2 = *((int*)(vfs.db[dIndex_1].data + ((index-72)%64)*4 ));
+            fileIndex = *((short*)(vfs.db[dIndex_2].data + offset + 30));
+            if(strcmp(vfs.db[dIndex].data+offset,filename) == 0){
+                return fileIndex;
+            }
+            //printf("%s %dB\n",vfs.db[dIndex_2].data+offset,vfs.inodeList[fileIndex].file_size);
+            filesize -= 32;
+            offset += 32;
+            if(offset == vfs.sb.sb.blocksize){
+                offset = 0;
+                index += 1;
+            } 
+        }
+    }
+    return -1;
+}
+
+void restore_index(char* bitmask,int bitmask_size,int index){
+    char* pointer = bitmask + (index/8);
+    if(index%8 == 0)
+        *pointer = *pointer & (~(0x80));
+    else if(index%8 == 1)
+        *pointer = *pointer & (~(0x40));
+    else if(index%8 == 2)
+        *pointer = *pointer & (~(0x20));
+    else if(index%8 == 3)
+        *pointer = *pointer & (~(0x10));
+    else if(index%8 == 4)
+        *pointer = *pointer & (~(0x08));
+    else if(index%8 == 5)
+        *pointer = *pointer & (~(0x04));
+    else if(index%8 == 6)
+        *pointer = *pointer & (~(0x02));
+    else if(index%8 == 7)
+        *pointer = *pointer & (~(0x01));
+    return;
+}
+
 int ls_myfs(){
     inode* inodeTemp = &vfs.inodeList[pwd_inode];
     int filesize = inodeTemp->file_size,index = 0,offset = 0,dIndex, dIndex_1, dIndex_2, fileIndex;    
@@ -441,6 +516,44 @@ int rm_myfs(char* filename){
 
 }
 
+int showfile_myfs(char* filename){
+    int index = 0, dIndex, dIndex_1, dIndex_2;
+    int fileInode = getfilename_inode(filename);
+    printf("\n#####Showing File Inode %d with file Name %s#######\n", fileInode,filename);
+    if(fileInode == -1)
+        return -1;
+    inode* inodeTemp = &vfs.inodeList[fileInode];
+    int index_count = ceil(double(inodeTemp->file_size)/vfs.sb.sb.blocksize);
+    //printf("Max inodes to get %d\n",index_count);
+    
+    while(index < index_count){
+        //printf("<<<<<<<<<<<<<<<Showing Index %d",index);
+        if(index < 8){
+            dIndex = inodeTemp->dataList[index];
+            //printf("<<<<<<<<<<<<<<<Showing Index %d\n",dIndex);
+            printf("%s",vfs.db[dIndex].data);
+            index++;
+        }
+        else if(index < 72){
+            dIndex = inodeTemp->dataList[8];
+            dIndex_1 = *((int*)(vfs.db[dIndex].data + (index-8)*4));
+            //printf("<<<<<<<<<<<<<<<Showing Index %d\n",dIndex_1);
+            printf("%s",vfs.db[dIndex_1].data);
+            index++;
+        }
+        else{
+            dIndex = inodeTemp->dataList[9];
+            dIndex_1 = *((int*)(vfs.db[dIndex].data + ((index-72)/64)*4));
+            dIndex_2 = *((int*)(vfs.db[dIndex_1].data + ((index-72)%64)*4));
+            //printf("<<<<<<<<<<<<<<<Showing Index %d\n",dIndex_2);
+            printf("%s",vfs.db[dIndex_2].data);
+            index++;
+        }
+    }
+    printf("\n");
+    return fileInode;
+}
+
 int copy_pc2myfs(char* source,char* dest){
     int inode_index,n;
     int i, free_inode_index = 0,free_db_index,file_size;
@@ -465,13 +578,14 @@ int copy_pc2myfs(char* source,char* dest){
     fd = fopen(source,"r");
     while(feof(fd) == 0){
         free_db_index = getfreeindex(vfs.sb.mask.free_disk_bitmask,vfs.sb.mask.disk_bitmask_size);
-        n = fread(vfs.db[free_db_index].data,1,vfs.sb.sb.blocksize,fd);
+        n = fread(vfs.db[free_db_index].data,1,vfs.sb.sb.blocksize-1,fd);
+        vfs.db[free_db_index].data[n] = '\0';
         //printf("Free DB INDEX%d\n",free_db_index);
         //printf("%s",vfs.db[free_db_index]);
         syncdata(&vfs.sb,&vfs.db[free_db_index],free_db_index);
         vfs.sb.sb.used_disk_blocks += 1;
-        tempInode->file_size += n;
         insertDataIndex(tempInode,free_db_index); 
+        tempInode->file_size += n+1;
     }
     //printf("File size : %d\n",tempInode->file_size);
     insertFileInode(dest,free_inode_index);
@@ -486,5 +600,3 @@ int copy_pc2myfs(char* source,char* dest){
     */
     return 1;
 }
-
-

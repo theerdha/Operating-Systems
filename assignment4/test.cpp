@@ -19,6 +19,7 @@ int main(){
     copy_pc2myfs("myfs.h","myfs10.h");
     copy_pc2myfs("myfs.h","myfs11.h");
     copy_pc2myfs("test.cpp","test.cpp");
+    showfile_myfs("myfs1.h");
     ls_myfs();
     return 0;
 }
