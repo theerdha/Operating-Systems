@@ -52,6 +52,18 @@ typedef struct filesystem{
     int blocks_for_datablocks;
 } filesystem;
 
+// File Table entry
+typedef struct file_table_entry{
+    int mode;
+    int offset;
+} file_table_entry;
+
+// FILE TABLE
+typedef struct filetable{
+    file_table_entry* ft;
+    int max_index;
+} filetable;
+
 /*
  * Global variables
  */
@@ -59,7 +71,7 @@ typedef struct filesystem{
 char* myfs; // Actual In memory File system 
 int pwd_inode = 0; // Present working directory inode
 filesystem vfs;
-
+filetable vft;
 
 /* 
  * Synchronization operations for superblock, inodes and datablock   
@@ -153,7 +165,7 @@ int create_myfs(int size,int max_inodes){
         fprintf(stderr,"Error allocating memory\n");
         return -1;
     }
-    
+    vft.max_index = 0;
     vfs.sb.sb.filesystem_size = size * 1024 * 1024;
     vfs.sb.sb.blocksize = BLOCKSIZE;
     vfs.inodeList = (inode*)malloc(sizeof(inode)*max_inodes);
@@ -201,7 +213,7 @@ int create_myfs(int size,int max_inodes){
     return 1;
 }
 
-void myfs_info(){
+void status_myfs(){
     printf("\n######## File System Info #########\nCreated superblock with %d blocks\n", vfs.blocks_for_superblock);
     printf("Blocks left in inode list with %d blocks\n", vfs.sb.sb.max_inodes - vfs.sb.sb.used_inodes);
     printf("Blocks left in Data blocks with %d blocks\n", vfs.sb.sb.max_disk_blocks - vfs.sb.sb.used_disk_blocks);
@@ -531,6 +543,44 @@ int ls_myfs(){
 }
 
 int rm_myfs(char* filename){
+    int fileInode = getfilename_inode(filename);
+    if(fileInode == -1)
+        return -1;
+    inode* tempInode = &vfs.inodeList[fileInode];
+    int index_count = ceil(double(tempInode->file_size)/vfs.sb.sb.blocksize);
+    int index = 0, dIndex, dIndex_1, dIndex_2;
+    while(index < index_count){
+        if(index < 8){
+            dIndex = tempInode->dataList[index];
+            restore_index(vfs.sb.mask.free_disk_bitmask,vfs.sb.mask.disk_bitmask_size,dIndex);
+            index++;
+        }
+        else if(index < 72){
+            dIndex = tempInode->dataList[8];
+            dIndex_1 = *((int*)(vfs.db[dIndex].data + (index-8)*4 ));
+            restore_index(vfs.sb.mask.free_disk_bitmask,vfs.sb.mask.disk_bitmask_size,dIndex_1);
+            index++;
+        }
+        else{
+            if(index == 72){
+                restore_index(vfs.sb.mask.free_disk_bitmask,vfs.sb.mask.disk_bitmask_size,tempInode->dataList[8]);
+            }
+            dIndex = tempInode->dataList[9];
+            dIndex_1 = *((int*)(vfs.db[dIndex].data + ((index - 72)/64)*4 ));
+            dIndex_2 = *((int*)(vfs.db[dIndex_1].data + ((index - 72)%64)*4 ));
+            restore_index(vfs.sb.mask.free_disk_bitmask,vfs.sb.mask.disk_bitmask_size,dIndex_2);
+            index++;
+            if((index-72)%64 == 0)
+                restore_index(vfs.sb.mask.free_disk_bitmask,vfs.sb.mask.disk_bitmask_size,dIndex_1);
+        }
+    }
+    //restore_index(vfs.sb.mask.free_inode_bitmask,vfs.sb.mask.inode_bitmask_size,fileInode);
+    // TODO remove filename from pwd_inode
+
+    return 1;
+}
+
+int rmdir_myfs(char* dirname){
 
 }
 
@@ -685,3 +735,35 @@ int chdir_myfs(char* dirname){
     return 1;
 }
 
+int open_myfs(char* filename,char mode){
+    int fileInode = getfilename_inode(filename);
+    int max_index_1 = vft.max_index;
+    if(fileInode == -1)
+        return -1;
+    if(vft.max_index == 0){
+        vft.ft = (file_table_entry*) malloc(sizeof(file_table_entry));
+        vft.ft[0].offset = -1;
+    }
+
+    for(int i = 0; i < max_index_1; i++){
+        if(vft.ft[i].offset == -1){
+            vft.ft[i].mode = (int) mode; 
+            vft.ft[i].offset = 0;
+            vft.max_index += 1;
+            return i;        
+        }
+    }
+    vft.ft = (file_table_entry*) realloc(vft.ft,sizeof(file_table_entry)*(max_index_1 + 1));
+    vft.ft[max_index_1].mode = (int) mode; 
+    vft.ft[max_index_1].offset = 0;
+    vft.max_index += 1;
+    return max_index_1;
+}
+
+int close_myfs(int fd){
+    if(vft.ft[fd].offset == -1)
+        return -1;
+    else
+        vft.ft[fd].offset = -1;
+    return 0;
+}

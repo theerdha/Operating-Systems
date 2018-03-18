@@ -7,7 +7,7 @@ int main(){
     int status;
     if((status = create_myfs(10,512)) == -1)
         cerr << "Error creating filesystem\n";
-    myfs_info();
+    status_myfs();
     copy_pc2myfs("myfs.h","myfs1.h");
     copy_pc2myfs("myfs.h","myfs2.h");
     copy_pc2myfs("myfs.h","myfs3.h");
@@ -27,6 +27,8 @@ int main(){
     ls_myfs();
     chdir_myfs("..");
     ls_myfs();
-    myfs_info();
+	status_myfs();
+    rm_myfs("myfs11.h");
+    status_myfs();
     return 0;
 }
