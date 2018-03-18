@@ -166,6 +166,7 @@ int create_myfs(int size,int max_inodes){
         fprintf(stderr,"Error allocating memory\n");
         return -1;
     }
+    myfs_ = myfs;
     vft.max_index = 0;
     vfs.sb.sb.filesystem_size = size * 1024 * 1024;
     vfs.sb.sb.blocksize = BLOCKSIZE;
@@ -174,8 +175,9 @@ int create_myfs(int size,int max_inodes){
     no_of_data_blocks = (size*1024*4 - max_inodes);
     vfs.blocks_for_datablocks = no_of_data_blocks - ceil(double(no_of_data_blocks)/(8*vfs.sb.sb.blocksize) + max_inodes/8 + double(20)/vfs.sb.sb.blocksize);
     vfs.blocks_for_superblock = size*1024*4 - vfs.blocks_for_datablocks - vfs.blocks_for_inodelist;
-    vfs.db = (datablock*) malloc(sizeof(datablock)*no_of_data_blocks);
-    myfs_ = myfs;
+    myfs_ += (vfs.blocks_for_inodelist + vfs.blocks_for_superblock)*BLOCKSIZE;
+    //vfs.db = (datablock*) malloc(sizeof(datablock)*no_of_data_blocks);
+    vfs.db = (datablock*)myfs_;
     
     /* Initialize super block */
 
@@ -893,10 +895,10 @@ int write_myfs(int fd,int nbytes, char* buf){
     i2 = ceil(double(offset + nbytes)/blocksize);
     printf("filesize: %d i1 : %d , i2 : %d\n",inodeTemp->file_size,i1,i2);
     base = i1;
-    while(base < index && base <= i2){
+    while(base <= i2){
         if(base < 8){
-            dIndex = inodeTemp->dataList[base];
             if(base == i2-1){
+                dIndex = inodeTemp->dataList[base];
                 temp = ((offset + nbytes < inodeTemp->file_size) ? (offset + nbytes) : (inodeTemp->file_size));
                 bcopy(point, vfs.db[dIndex].data+ offset%blocksize, (temp)%blocksize - offset%blocksize );
                 bytes_read += (temp)%blocksize - offset%blocksize;
@@ -906,18 +908,19 @@ int write_myfs(int fd,int nbytes, char* buf){
             }
             else{
                 if(base == index-1)
-                    upper_bound = inodeTemp->file_size%blocksize;
-                bcopy(point, vfs.db[dIndex].data+ offset%blocksize, upper_bound - offset%blocksize );
-                point += upper_bound - offset%blocksize;
-                bytes_read += upper_bound - offset%blocksize;
-                offset += upper_bound - offset%blocksize;
+                    //TODO
+                dIndex = inodeTemp->dataList[base];
+                bcopy(point, vfs.db[dIndex].data+ offset%blocksize, blocksize - offset%blocksize );
+                point += blocksize - offset%blocksize;
+                bytes_read += blocksize - offset%blocksize;
+                offset += blocksize - offset%blocksize;
                 base += 1;
             }
         }
         else if(base < 72){
-            dIndex = inodeTemp->dataList[8];
-            dIndex_1 = *((int*)(vfs.db[dIndex].data + (base-8)*4));
             if(base == i2-1){
+                dIndex = inodeTemp->dataList[8];
+                dIndex_1 = *((int*)(vfs.db[dIndex].data + (base-8)*4));
                 temp = ((offset + nbytes < inodeTemp->file_size) ? (offset + nbytes) : (inodeTemp->file_size));
                 bcopy(point, vfs.db[dIndex_1].data+ offset%blocksize, (temp)%blocksize - offset%blocksize );
                 bytes_read += (temp)%blocksize - offset%blocksize;
@@ -927,19 +930,21 @@ int write_myfs(int fd,int nbytes, char* buf){
             }
             else{
                 if(base == index-1)
-                    upper_bound = inodeTemp->file_size%blocksize;
-                bcopy(point, vfs.db[dIndex_1].data+ offset%blocksize, upper_bound - offset%blocksize );
-                point += upper_bound - offset%blocksize;
-                bytes_read += upper_bound - offset%blocksize;
-                offset += upper_bound - offset%blocksize;
+                    //TODO
+                dIndex = inodeTemp->dataList[8];
+                dIndex_1 = *((int*)(vfs.db[dIndex].data + (base-8)*4));
+                bcopy(point, vfs.db[dIndex_1].data+ offset%blocksize, blocksize - offset%blocksize );
+                point += blocksize - offset%blocksize;
+                bytes_read += blocksize - offset%blocksize;
+                offset += blocksize - offset%blocksize;
                 base += 1;
             }
         }
         else{
-            dIndex = inodeTemp->dataList[9];
-            dIndex_1 = *((int*)(vfs.db[dIndex].data + ((base-72)/64)*4));
-            dIndex_2 = *((int*)(vfs.db[dIndex_1].data + ((base-72)%64)*4));
             if(base == i2-1){
+                dIndex = inodeTemp->dataList[9];
+                dIndex_1 = *((int*)(vfs.db[dIndex].data + ((base-72)/64)*4));
+                dIndex_2 = *((int*)(vfs.db[dIndex_1].data + ((base-72)%64)*4));
                 temp = ((offset + nbytes < inodeTemp->file_size) ? (offset + nbytes) : (inodeTemp->file_size));
                 bcopy(point, vfs.db[dIndex_2].data+ offset%blocksize, (temp)%blocksize - offset%blocksize );
                 bytes_read += (temp)%blocksize - offset%blocksize;
@@ -948,12 +953,16 @@ int write_myfs(int fd,int nbytes, char* buf){
                 return bytes_read;
             }
             else{
-                if(base == index-1)
-                    upper_bound = inodeTemp->file_size%blocksize;
-                bcopy(point, vfs.db[dIndex_2].data+ offset%blocksize, upper_bound - offset%blocksize );
-                point += upper_bound - offset%blocksize;
-                bytes_read += upper_bound - offset%blocksize;
-                offset += upper_bound - offset%blocksize;
+                if(base > index-1)
+                    //TODO
+                
+                dIndex = inodeTemp->dataList[9];
+                dIndex_1 = *((int*)(vfs.db[dIndex].data + ((base-72)/64)*4));
+                dIndex_2 = *((int*)(vfs.db[dIndex_1].data + ((base-72)%64)*4));
+                bcopy(point, vfs.db[dIndex_2].data+ offset%blocksize, blocksize - offset%blocksize );
+                point += blocksize - offset%blocksize;
+                bytes_read += blocksize - offset%blocksize;
+                offset += blocksize - offset%blocksize;
                 base += 1;
             }
         }
@@ -963,5 +972,6 @@ int write_myfs(int fd,int nbytes, char* buf){
     if(base == index)
         return bytes_read;
     return -1;
-}*/
+}
 
+*/
