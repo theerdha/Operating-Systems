@@ -877,7 +877,7 @@ int read_myfs(int fd,int nbytes, char* buf){
     return -1;
 }
 
-
+/*
 int write_myfs(int fd,int nbytes, char* buf){
     char* point = buf;
     int offset = vft.ft[fd].offset, dIndex, dIndex_1, dIndex_2;
@@ -963,5 +963,5 @@ int write_myfs(int fd,int nbytes, char* buf){
     if(base == index)
         return bytes_read;
     return -1;
-}
+}*/
 
