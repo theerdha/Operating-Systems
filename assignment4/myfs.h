@@ -32,9 +32,9 @@ typedef struct superblock{
 typedef struct inode{
     int file_size;
     int dataList[8];
-    char filetype_permission[2];
-    char timeLastModified[26];
-    char timeLastRead[26];
+    char timeLastModified[28];
+    char timeLastRead[28];
+    char filetype_permission[4];
 } inode;
 
 // Data structure of datablock
@@ -119,6 +119,7 @@ void syncSB(superblock* sb){
 }
 
 // Synchronize inode with given index
+/*
 void syncInode(superblock* sb,inode* in,int index){
     char* myfs_ = myfs;
     char* temp;
@@ -127,30 +128,31 @@ void syncInode(superblock* sb,inode* in,int index){
     myfs_ += (index + vfs.blocks_for_superblock)*sb->sb.blocksize;
     in_ = (inode*) myfs_;
     *in_ = *in;
-    /*
     printf("Size of inode %d\n",sizeof(inode));
     printf("1. %d\n",*((int*)(myfs_)));
     printf("2. %d\n",*((int*)(myfs_+4)));
     printf("3. %d\n",*((char*)(myfs_+44)));
-    */
+    
     return;
 }
-
+*/
 // Synchronize datablock with given index
+/*
 void syncdata(superblock* sb, datablock* db, int index){
     char* myfs_ = myfs;
     datablock* db_;
     myfs_ += sb->sb.blocksize*(vfs.blocks_for_superblock+vfs.blocks_for_inodelist + index);
     db_ = (datablock*)myfs_;
     *db_ = *db;
-    /*
+    
     printf("1. %s\n",myfs_);
     printf("2. %d\n",*(unsigned int*)(myfs_+30));
     printf("3. %s\n",myfs_ + 32);
     printf("4. %d\n",*(unsigned int*)(myfs_+62));
-    */
+    
     return;
 }
+*/
 
 // Assuming the system to be byte addressable
 int create_myfs(int size,int max_inodes){
@@ -170,11 +172,14 @@ int create_myfs(int size,int max_inodes){
     vft.max_index = 0;
     vfs.sb.sb.filesystem_size = size * 1024 * 1024;
     vfs.sb.sb.blocksize = BLOCKSIZE;
-    vfs.inodeList = (inode*)malloc(sizeof(inode)*max_inodes);
+    myfs_ += BLOCKSIZE*max_inodes;
+    //vfs.inodeList = (inode*)malloc(sizeof(inode)*max_inodes);
+    vfs.inodeList = (inode*)myfs_;
     vfs.blocks_for_inodelist = max_inodes; 
     no_of_data_blocks = (size*1024*4 - max_inodes);
     vfs.blocks_for_datablocks = no_of_data_blocks - ceil(double(no_of_data_blocks)/(8*vfs.sb.sb.blocksize) + max_inodes/8 + double(20)/vfs.sb.sb.blocksize);
     vfs.blocks_for_superblock = size*1024*4 - vfs.blocks_for_datablocks - vfs.blocks_for_inodelist;
+    myfs_ = myfs;
     myfs_ += (vfs.blocks_for_inodelist + vfs.blocks_for_superblock)*BLOCKSIZE;
     //vfs.db = (datablock*) malloc(sizeof(datablock)*no_of_data_blocks);
     vfs.db = (datablock*)myfs_;
@@ -194,7 +199,7 @@ int create_myfs(int size,int max_inodes){
     vfs.sb.mask.free_inode_bitmask[0] = 0x80; 
     vfs.sb.mask.free_disk_bitmask[0] = 0x80;
     syncSB(&vfs.sb);
-   
+    //printf("inode size %d\n",sizeof(inode));
     printf("Created superblock with %d blocks\n", vfs.blocks_for_superblock);
     printf("Created inode list with %d blocks\n", vfs.blocks_for_inodelist);
     printf("Created data block with %d blocks\n", vfs.blocks_for_datablocks);
@@ -206,13 +211,13 @@ int create_myfs(int size,int max_inodes){
     initInode(in_temp);
     in_temp->file_size = 32;
     in_temp->dataList[0] = 0;
-    syncInode(&vfs.sb,in_temp,0);
+    //syncInode(&vfs.sb,in_temp,0);
     
     /* Initializing the root directory */
     // Each directory entry is stored as 32 bytes data. 30 bytes for file/directory name and 2 bytes for inode number.
     strcpy(vfs.db[0].data,".");
     bzero(vfs.db[0].data+30,2);
-    syncdata(&vfs.sb,&vfs.db[0],0);
+    //syncdata(&vfs.sb,&vfs.db[0],0);
     return 1;
 }
 
@@ -288,7 +293,7 @@ void insertDataIndex(inode* in,int dIndex){
         di = in->dataList[8];    
         x = (int*) (vfs.db[di].data + (index-8)*4);
         *x = dIndex;
-        syncdata(&vfs.sb,&vfs.db[di],di);
+        //syncdata(&vfs.sb,&vfs.db[di],di);
     }
     else{
         if(index == 72){
@@ -302,8 +307,8 @@ void insertDataIndex(inode* in,int dIndex){
         di_2 = *((int*)(vfs.db[di].data + ((index-72)/64)*4));
         x = (int*)(vfs.db[di_2].data + ((index-72)%64)*4);
         *x = dIndex;
-        syncdata(&vfs.sb,&vfs.db[di],di);
-        syncdata(&vfs.sb,&vfs.db[di_2],di_2);
+        //syncdata(&vfs.sb,&vfs.db[di],di);
+        //syncdata(&vfs.sb,&vfs.db[di_2],di_2);
     }
     return;
 }
@@ -323,7 +328,7 @@ void insertFileInode(int pwd_inode_,char* filename,int fileInode){
             strcpy(vfs.db[dIndex].data + offset,filename);
             n = (short*) (vfs.db[dIndex].data + offset + 30);
             *n = (short) fileInode;
-            syncdata(&vfs.sb,&vfs.db[dIndex],dIndex);
+            //syncdata(&vfs.sb,&vfs.db[dIndex],dIndex);
         }
         else{
             dIndex = getfreeindex(vfs.sb.mask.free_disk_bitmask,vfs.sb.mask.disk_bitmask_size);
@@ -331,7 +336,7 @@ void insertFileInode(int pwd_inode_,char* filename,int fileInode){
             strcpy(vfs.db[dIndex].data ,filename);
             n = (short*) (vfs.db[dIndex].data + 30);
             *n = (short) fileInode;
-            syncdata(&vfs.sb,&vfs.db[dIndex],dIndex);
+            //syncdata(&vfs.sb,&vfs.db[dIndex],dIndex);
         }
     }
     else if(index < 72){
@@ -359,8 +364,8 @@ void insertFileInode(int pwd_inode_,char* filename,int fileInode){
         strcpy(vfs.db[dIndex_1].data + offset,filename);
         n = (short*) (vfs.db[dIndex_1].data + offset + 30);
         *n = (short) fileInode;
-        syncdata(&vfs.sb,&vfs.db[dIndex],dIndex);
-        syncdata(&vfs.sb,&vfs.db[dIndex_1],dIndex_1);
+        //syncdata(&vfs.sb,&vfs.db[dIndex],dIndex);
+        //syncdata(&vfs.sb,&vfs.db[dIndex_1],dIndex_1);
     }
     else{
         if(index == 72 && filesize%256 == 0){
@@ -411,9 +416,9 @@ void insertFileInode(int pwd_inode_,char* filename,int fileInode){
         strcpy(vfs.db[dIndex_2].data + offset2,filename);
         n = (short*) (vfs.db[dIndex_2].data + offset2 + 30);
         *n = (short) fileInode;
-        syncdata(&vfs.sb,&vfs.db[dIndex],dIndex);
-        syncdata(&vfs.sb,&vfs.db[dIndex_1],dIndex_1);
-        syncdata(&vfs.sb,&vfs.db[dIndex_2],dIndex_2);
+        //syncdata(&vfs.sb,&vfs.db[dIndex],dIndex);
+        //syncdata(&vfs.sb,&vfs.db[dIndex_1],dIndex_1);
+        //syncdata(&vfs.sb,&vfs.db[dIndex_2],dIndex_2);
     }
     tempInode->file_size += 32;
     return;
@@ -658,14 +663,14 @@ int copy_pc2myfs(char* source,char* dest){
         n = fread(vfs.db[free_db_index].data,1,vfs.sb.sb.blocksize,fd);
         //printf("Free DB INDEX%d\n",free_db_index);
         //printf("%s",vfs.db[free_db_index]);
-        syncdata(&vfs.sb,&vfs.db[free_db_index],free_db_index);
+        //syncdata(&vfs.sb,&vfs.db[free_db_index],free_db_index);
         insertDataIndex(tempInode,free_db_index); 
         tempInode->file_size += n;
     }
     //printf("File size : %d\n",tempInode->file_size);
     insertFileInode(pwd_inode,dest,free_inode_index);
-    syncInode(&vfs.sb,tempInode,free_inode_index); 
-    syncInode(&vfs.sb,&vfs.inodeList[pwd_inode],pwd_inode);
+    //syncInode(&vfs.sb,tempInode,free_inode_index); 
+    //syncInode(&vfs.sb,&vfs.inodeList[pwd_inode],pwd_inode);
     syncSB(&vfs.sb);
     fclose(fd);
     /*
@@ -729,8 +734,8 @@ int mkdir_myfs(char* dirname){
     insertFileInode(free_inode_index,".",free_inode_index);
     insertFileInode(free_inode_index,"..",pwd_inode);
     insertFileInode(pwd_inode, dirname,free_inode_index);
-    syncInode(&vfs.sb,tempInode,free_inode_index); 
-    syncInode(&vfs.sb,&vfs.inodeList[pwd_inode],pwd_inode);
+    //syncInode(&vfs.sb,tempInode,free_inode_index); 
+    //syncInode(&vfs.sb,&vfs.inodeList[pwd_inode],pwd_inode);
     syncSB(&vfs.sb);
     return 1;
 }
