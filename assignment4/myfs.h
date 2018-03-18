@@ -54,6 +54,7 @@ typedef struct filesystem{
 
 // File Table entry
 typedef struct file_table_entry{
+    int fileInode;
     int mode;
     int offset;
 } file_table_entry;
@@ -749,6 +750,7 @@ int open_myfs(char* filename,char mode){
         if(vft.ft[i].offset == -1){
             vft.ft[i].mode = (int) mode; 
             vft.ft[i].offset = 0;
+            vft.ft[i].fileInode = fileInode;
             vft.max_index += 1;
             return i;        
         }
@@ -756,6 +758,7 @@ int open_myfs(char* filename,char mode){
     vft.ft = (file_table_entry*) realloc(vft.ft,sizeof(file_table_entry)*(max_index_1 + 1));
     vft.ft[max_index_1].mode = (int) mode; 
     vft.ft[max_index_1].offset = 0;
+    vft.ft[max_index_1].fileInode = fileInode;
     vft.max_index += 1;
     return max_index_1;
 }
@@ -766,4 +769,75 @@ int close_myfs(int fd){
     else
         vft.ft[fd].offset = -1;
     return 0;
+}
+
+int read_myfs(int fd,int nbytes, char* buf){
+    char* point = buf;
+    int offset = vft.ft[fd].offset, dIndex, dIndex_1, dIndex_2;
+    int fileInode = vft.ft[fd].fileInode,base, i1, i2, temp, bytes_read = 0;
+    inode * inodeTemp;
+    int blocksize = vfs.sb.sb.blocksize;
+    if(vft.ft[fd].mode != int('r'))  
+        return -1;
+    inodeTemp = &vfs.inodeList[fileInode];
+    i1 = offset/blocksize;
+    i2 = (offset + nbytes)/blocksize;
+    base = i1;
+    while(base <= i2){
+        if(base < 8){
+            dIndex = inodeTemp->dataList[base];
+            if(base == i2){
+                temp = ((offset + nbytes < inodeTemp->file_size) ? (offset + nbytes) : (inodeTemp->file_size));
+                bcopy(vfs.db[dIndex].data+ offset%blocksize, point, (temp)%blocksize - offset%blocksize );
+                bytes_read += (temp)%blocksize - offset%blocksize;
+                offset += (temp)%blocksize - offset%blocksize;
+                return bytes_read;
+            }
+            else{
+                bcopy(vfs.db[dIndex].data+ offset%blocksize, point, blocksize - offset%blocksize );
+                point += blocksize - offset%blocksize;
+                offset += blocksize - offset%blocksize;
+                bytes_read += blocksize - offset%blocksize;
+                base += 1;
+            }
+        }
+        else if(base < 72){
+            dIndex = inodeTemp->dataList[8];
+            dIndex_1 = *((int*)(vfs.db[dIndex].data + (base-8)*4));
+            if(base == i2){
+                temp = ((offset + nbytes < inodeTemp->file_size) ? (offset + nbytes) : (inodeTemp->file_size));
+                bcopy(vfs.db[dIndex_1].data+ offset%blocksize, point, (temp)%blocksize - offset%blocksize );
+                bytes_read += (temp)%blocksize - offset%blocksize;
+                offset += (temp)%blocksize - offset%blocksize;
+                return bytes_read;
+            }
+            else{
+                bcopy(vfs.db[dIndex_1].data+ offset%blocksize, point, blocksize - offset%blocksize );
+                point += blocksize - offset%blocksize;
+                offset += blocksize - offset%blocksize;
+                bytes_read += blocksize - offset%blocksize;
+                base += 1;
+            }
+        }
+        else{
+            dIndex = inodeTemp->dataList[8];
+            dIndex_1 = *((int*)(vfs.db[dIndex].data + ((base-72)/64)*4));
+            dIndex_2 = *((int*)(vfs.db[dIndex].data + ((base-72)%64)*4));
+            if(base == i2){
+                temp = ((offset + nbytes < inodeTemp->file_size) ? (offset + nbytes) : (inodeTemp->file_size));
+                bcopy(vfs.db[dIndex_2].data+ offset%blocksize, point, (temp)%blocksize - offset%blocksize );
+                bytes_read += (temp)%blocksize - offset%blocksize;
+                offset += (temp)%blocksize - offset%blocksize;
+                return bytes_read;
+            }
+            else{
+                bcopy(vfs.db[dIndex_2].data+ offset%blocksize, point, blocksize - offset%blocksize );
+                point += blocksize - offset%blocksize;
+                offset += blocksize - offset%blocksize;
+                bytes_read += blocksize - offset%blocksize;
+                base += 1;
+            }
+        }
+    }
+    return -1;
 }
