@@ -5,6 +5,7 @@ using namespace std;
 
 int main(){
     int status;
+    char* buf = (char*) malloc(10000);
     if((status = create_myfs(10,512)) == -1)
         cerr << "Error creating filesystem\n";
     status_myfs();
@@ -22,7 +23,7 @@ int main(){
     copy_pc2myfs("test.cpp","test.cpp");
     copy_myfs2pc("test.cpp","test1.cpp");
     mkdir_myfs("buridi");
-    //showfile_myfs("myfs1.h");
+    showfile_myfs("myfs1.h");
     chdir_myfs("buridi");
     ls_myfs();
     chdir_myfs("..");
@@ -30,5 +31,11 @@ int main(){
 	status_myfs();
     rm_myfs("myfs11.h");
     status_myfs();
+    int fd = open_myfs("myfs1.h",'r');
+    printf("File descriptor : %d\n",fd);
+    int bytes = read_myfs(fd,9999,buf);
+    buf[9999] = '\0';
+    printf("%s\n",buf);
+    printf("bytes read : %d\n",bytes);
     return 0;
 }

@@ -594,20 +594,24 @@ int showfile_myfs(char* filename){
     inode* inodeTemp = &vfs.inodeList[fileInode];
     int index_count = ceil(double(inodeTemp->file_size)/vfs.sb.sb.blocksize);
     //printf("Max inodes to get %d\n",index_count);
-    
+    char buf[vfs.sb.sb.blocksize+1];
     while(index < index_count){
         //printf("<<<<<<<<<<<<<<<Showing Index %d",index);
         if(index < 8){
             dIndex = inodeTemp->dataList[index];
             //printf("<<<<<<<<<<<<<<<Showing Index %d\n",dIndex);
-            printf("%s",vfs.db[dIndex].data);
+            bcopy(vfs.db[dIndex].data,buf,vfs.sb.sb.blocksize);
+            buf[vfs.sb.sb.blocksize] = '\0';
+            printf("%s",buf);
             index++;
         }
         else if(index < 72){
             dIndex = inodeTemp->dataList[8];
             dIndex_1 = *((int*)(vfs.db[dIndex].data + (index-8)*4));
             //printf("<<<<<<<<<<<<<<<Showing Index %d\n",dIndex_1);
-            printf("%s",vfs.db[dIndex_1].data);
+            bcopy(vfs.db[dIndex_1].data,buf,vfs.sb.sb.blocksize);
+            buf[vfs.sb.sb.blocksize] = '\0';
+            printf("%s",buf);
             index++;
         }
         else{
@@ -615,7 +619,9 @@ int showfile_myfs(char* filename){
             dIndex_1 = *((int*)(vfs.db[dIndex].data + ((index-72)/64)*4));
             dIndex_2 = *((int*)(vfs.db[dIndex_1].data + ((index-72)%64)*4));
             //printf("<<<<<<<<<<<<<<<Showing Index %d\n",dIndex_2);
-            printf("%s",vfs.db[dIndex_2].data);
+            bcopy(vfs.db[dIndex_2].data,buf,vfs.sb.sb.blocksize);
+            buf[vfs.sb.sb.blocksize] = '\0';
+            printf("%s",buf);
             index++;
         }
     }
@@ -647,13 +653,12 @@ int copy_pc2myfs(char* source,char* dest){
     fd = fopen(source,"r");
     while(feof(fd) == 0){
         free_db_index = getfreeindex(vfs.sb.mask.free_disk_bitmask,vfs.sb.mask.disk_bitmask_size);
-        n = fread(vfs.db[free_db_index].data,1,vfs.sb.sb.blocksize-1,fd);
-        vfs.db[free_db_index].data[n] = '\0';
+        n = fread(vfs.db[free_db_index].data,1,vfs.sb.sb.blocksize,fd);
         //printf("Free DB INDEX%d\n",free_db_index);
         //printf("%s",vfs.db[free_db_index]);
         syncdata(&vfs.sb,&vfs.db[free_db_index],free_db_index);
         insertDataIndex(tempInode,free_db_index); 
-        tempInode->file_size += n+1;
+        tempInode->file_size += n;
     }
     //printf("File size : %d\n",tempInode->file_size);
     insertFileInode(pwd_inode,dest,free_inode_index);
@@ -677,22 +682,23 @@ int copy_myfs2pc(char* source, char* dest){
     if(fileInode == -1)
         return -1;
     inode* inodeTemp = &vfs.inodeList[fileInode];
-    int index_count = ceil(double(inodeTemp->file_size)/vfs.sb.sb.blocksize);
+    int index_count = ceil(double(inodeTemp->file_size)/vfs.sb.sb.blocksize),size;
     //printf("Max inodes to get %d\n",index_count);
     
     while(index < index_count){
         //printf("<<<<<<<<<<<<<<<Showing Index %d",index);
+        size = ((index == index_count - 1) ? (inodeTemp->file_size%vfs.sb.sb.blocksize) : (vfs.sb.sb.blocksize));
         if(index < 8){
             dIndex = inodeTemp->dataList[index];
             //printf("<<<<<<<<<<<<<<<Showing Index %d\n",dIndex);
-            fwrite(vfs.db[dIndex].data,1,strlen(vfs.db[dIndex].data),fd);
+            fwrite(vfs.db[dIndex].data,1,size,fd);
             index++;
         }
         else if(index < 72){
             dIndex = inodeTemp->dataList[8];
             dIndex_1 = *((int*)(vfs.db[dIndex].data + (index-8)*4));
             //printf("<<<<<<<<<<<<<<<Showing Index %d\n",dIndex_1);
-            fwrite(vfs.db[dIndex_1].data,1,strlen(vfs.db[dIndex_1].data),fd);
+            fwrite(vfs.db[dIndex_1].data,1,size,fd);
             index++;
         }
         else{
@@ -700,7 +706,7 @@ int copy_myfs2pc(char* source, char* dest){
             dIndex_1 = *((int*)(vfs.db[dIndex].data + ((index-72)/64)*4));
             dIndex_2 = *((int*)(vfs.db[dIndex_1].data + ((index-72)%64)*4));
             //printf("<<<<<<<<<<<<<<<Showing Index %d\n",dIndex_2);
-            fwrite(vfs.db[dIndex_2].data,1,strlen(vfs.db[dIndex_2].data),fd);
+            fwrite(vfs.db[dIndex_2].data,1,size,fd);
             index++;
         }
     }
@@ -782,6 +788,7 @@ int read_myfs(int fd,int nbytes, char* buf){
     inodeTemp = &vfs.inodeList[fileInode];
     i1 = offset/blocksize;
     i2 = (offset + nbytes)/blocksize;
+    printf("i1 : %d , i2 : %d",i1,i2);
     base = i1;
     while(base <= i2){
         if(base < 8){
@@ -794,6 +801,7 @@ int read_myfs(int fd,int nbytes, char* buf){
                 return bytes_read;
             }
             else{
+                // TODO file size limit
                 bcopy(vfs.db[dIndex].data+ offset%blocksize, point, blocksize - offset%blocksize );
                 point += blocksize - offset%blocksize;
                 offset += blocksize - offset%blocksize;
@@ -841,3 +849,5 @@ int read_myfs(int fd,int nbytes, char* buf){
     }
     return -1;
 }
+
+
