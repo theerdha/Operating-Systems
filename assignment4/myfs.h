@@ -720,7 +720,20 @@ int rm_myfs(char* filename){
 }
 
 int rmdir_myfs(char* dirname){
-
+    int fileInode = getfilename_inode(dirname);
+    if(fileInode == -1)
+        return -1;
+    inode* tempInode = &vfs.inodeList[fileInode];
+    if(tempInode->file_size != 64){
+        printf("Directory not empty\n");
+        return -1;
+    }
+    int dIndex;
+    dIndex = tempInode->dataList[0];
+    restore_index(vfs.sb.mask.free_disk_bitmask,vfs.sb.mask.disk_bitmask_size,dIndex);
+    remove_filename_pwd(dirname);
+    restore_index(vfs.sb.mask.free_inode_bitmask,vfs.sb.mask.inode_bitmask_size,fileInode);
+    return 1;
 }
 
 int showfile_myfs(char* filename){

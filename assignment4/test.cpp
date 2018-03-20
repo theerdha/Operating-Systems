@@ -11,7 +11,6 @@ int main(){
         cerr << "Error creating filesystem\n";
     status_myfs();
     int temp = 1,i;
-    ls_myfs();
     copy_pc2myfs("myfs.h","myfs1.h");
     copy_pc2myfs("myfs.h","myfs2.h");
     copy_pc2myfs("myfs.h","myfs3.h");
@@ -24,12 +23,14 @@ int main(){
     copy_pc2myfs("myfs.h","myfs10.h");
     copy_pc2myfs("myfs.h","myfs11.h");
     copy_pc2myfs("test.cpp","test.cpp");
-    copy_myfs2pc("test.cpp","test1.cpp");
+    //copy_myfs2pc("test.cpp","test1.cpp");
     mkdir_myfs("buridi");
+    ls_myfs();
     //showfile_myfs("myfs1.h");
     chdir_myfs("buridi");
     ls_myfs();
     chdir_myfs("..");
+    rmdir_myfs("buridi");
     ls_myfs();
     printf("Enter file name to delete.\n");
     scanf("%s",buf);
