@@ -92,8 +92,6 @@ void initInode(inode* in){
     asctime_r(local_time, in->timeLastModified);
     asctime_r(local_time, in->timeLastRead);
     in->file_size = 0;
-    for(i = 0; i < 10; i++)
-        in->dataList[i] = NULL;
 }
 
 // Synchronize super block with filesystem superblock
