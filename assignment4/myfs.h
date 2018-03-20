@@ -558,6 +558,130 @@ int ls_myfs(){
     return 1;
 }
 
+char* getInodeOffsetPWD(int index,int offset){
+    inode* inodeTemp = &vfs.inodeList[pwd_inode];
+    int filesize = inodeTemp->file_size,dIndex, dIndex_1, dIndex_2, fileIndex; 
+    int status = 0;  
+    if(index < 8){
+        dIndex = inodeTemp->dataList[index];
+        return (vfs.db[dIndex].data+offset);
+    }
+    else if(index < 72){
+        dIndex = inodeTemp->dataList[8];
+        dIndex_1 = *((int*)(vfs.db[dIndex].data + (index-8)*4 ));
+        return (vfs.db[dIndex_1].data + offset);
+    }
+    else{
+        dIndex = inodeTemp->dataList[9];
+        dIndex_1 = *((int*)(vfs.db[dIndex].data + ((index-72)/64)*4 ));
+        dIndex_2 = *((int*)(vfs.db[dIndex_1].data + ((index-72)%64)*4 ));
+        return (vfs.db[dIndex_2].data + offset);
+    }
+}
+
+int remove_filename_pwd(char* filename){
+    inode* inodeTemp = &vfs.inodeList[pwd_inode];
+    int filesize = inodeTemp->file_size,index = 0,offset = 0,dIndex, dIndex_1, dIndex_2, fileIndex; 
+    int status = 0;  
+    int pass1,pass2;
+    char* da;
+    while(filesize != 0){
+        if(index < 8){
+            dIndex = inodeTemp->dataList[index];            
+            if(status == 1 && filesize != 32){
+                if(offset+32 == vfs.sb.sb.blocksize){
+                    pass1 = index+1;
+                    pass2 = 0;
+                }
+                else{
+                    pass1 = index;
+                    pass2 = offset + 32;
+                }
+                da = getInodeOffsetPWD(pass1,pass2);
+                bcopy(da,vfs.db[dIndex].data + offset,32);
+                
+            }
+            else if(status == 0 && strcmp(vfs.db[dIndex].data+offset,filename) == 0){
+                status = 1 ;
+                continue;  
+            }
+            else if(filesize == 32){
+                break;
+            }
+            //printf("%s %dB\n",vfs.db[dIndex].data+offset,vfs.inodeList[fileIndex].file_size);
+            filesize -= 32;
+            offset += 32;
+            if(offset == vfs.sb.sb.blocksize){
+                offset = 0;
+                index += 1;
+            }
+        }
+        else if(index < 72){
+            dIndex = inodeTemp->dataList[8];
+            dIndex_1 = *((int*)(vfs.db[dIndex].data + (index-8)*4 ));
+            if(status == 1 && filesize != 32){
+                if(offset+32 == vfs.sb.sb.blocksize){
+                    pass1 = index+1;
+                    pass2 = 0;
+                }
+                else{
+                    pass1 = index;
+                    pass2 = offset + 32;
+                }
+                da = getInodeOffsetPWD(pass1,pass2);
+                bcopy(da,vfs.db[dIndex_1].data + offset,32);
+            }
+            else if(status == 0 && strcmp(vfs.db[dIndex_1].data+offset,filename) == 0){
+                status = 1;
+                continue;
+            }
+            else if(filesize == 32){
+                break;
+            }
+            //printf("%s %dB\n",vfs.db[dIndex_1].data+offset,vfs.inodeList[fileIndex].file_size);
+            filesize -= 32;
+            offset += 32;
+            if(offset == vfs.sb.sb.blocksize){
+                offset = 0;
+                index += 1;
+            }
+        }
+        else{
+            dIndex = inodeTemp->dataList[9];
+            dIndex_1 = *((int*)(vfs.db[dIndex].data + ((index-72)/64)*4 ));
+            dIndex_2 = *((int*)(vfs.db[dIndex_1].data + ((index-72)%64)*4 ));
+            if(status == 1 && filesize != 32){
+                if(offset+32 == vfs.sb.sb.blocksize){
+                    pass1 = index+1;
+                    pass2 = 0;
+                }
+                else{
+                    pass1 = index;
+                    pass2 = offset + 32;
+                }
+                da = getInodeOffsetPWD(pass1,pass2);
+                bcopy(da,vfs.db[dIndex_2].data + offset,32);
+            }
+            else if(status == 0 && strcmp(vfs.db[dIndex_2].data+offset,filename) == 0){
+                status = 1;
+                continue;
+            }
+            else if(filesize == 32){
+                break;
+            }
+            //printf("%s %dB\n",vfs.db[dIndex_2].data+offset,vfs.inodeList[fileIndex].file_size);
+            filesize -= 32;
+            offset += 32;
+            if(offset == vfs.sb.sb.blocksize){
+                offset = 0;
+                index += 1;
+            } 
+        }
+    }
+    inodeTemp->file_size -= 32;
+    return 1;
+}
+
 int rm_myfs(char* filename){
     int fileInode = getfilename_inode(filename);
     if(fileInode == -1)
@@ -590,9 +714,8 @@ int rm_myfs(char* filename){
                 restore_index(vfs.sb.mask.free_disk_bitmask,vfs.sb.mask.disk_bitmask_size,dIndex_1);
         }
     }
-    //restore_index(vfs.sb.mask.free_inode_bitmask,vfs.sb.mask.inode_bitmask_size,fileInode);
-    // TODO remove filename from pwd_inode
-
+    remove_filename_pwd(filename);
+    restore_index(vfs.sb.mask.free_inode_bitmask,vfs.sb.mask.inode_bitmask_size,fileInode);
     return 1;
 }
 
@@ -655,23 +778,22 @@ int copy_pc2myfs(char* source,char* dest){
     // Get file size
     stat(source,&st);
     file_size = st.st_size;
-     
+    printf("\n#####Copying file Name %s into MRFS #######\n", source); 
     // Check disk space availability
     if((ceil(double(file_size)/vfs.sb.sb.blocksize) > vfs.sb.sb.max_disk_blocks - vfs.sb.sb.used_disk_blocks) && vfs.sb.sb.max_inodes - vfs.sb.sb.used_inodes >= 1){
         fprintf(stderr,"Insufficient disk space for data.\n");
         return -1;
     }
+
     free_inode_index = getfreeindex(vfs.sb.mask.free_inode_bitmask,vfs.sb.mask.inode_bitmask_size); 
     //printf("Free inode being used : %d\n",free_inode_index);  
     tempInode = &vfs.inodeList[free_inode_index];
     initInode(tempInode);
     tempInode->filetype_permission[0] = 0x01; 
     fd = fopen(source,"r");
-    int as = 1;
     while(feof(fd) == 0){
         free_db_index = getfreeindex(vfs.sb.mask.free_disk_bitmask,vfs.sb.mask.disk_bitmask_size);
         n = fread(vfs.db[free_db_index].data,1,vfs.sb.sb.blocksize,fd);
-        //printf("%d",n);
         //printf("Free DB INDEX%d\n",free_db_index);
         //printf("%s",vfs.db[free_db_index]);
         //syncdata(&vfs.sb,&vfs.db[free_db_index],free_db_index);
@@ -736,6 +858,7 @@ int copy_myfs2pc(char* source, char* dest){
 int mkdir_myfs(char* dirname){
     int free_inode_index;
     inode* tempInode;
+    printf("\n#####Making directory %s#######\n", dirname);
     if((1 > vfs.sb.sb.max_disk_blocks - vfs.sb.sb.used_disk_blocks) && vfs.sb.sb.max_inodes - vfs.sb.sb.used_inodes >= 1){
         fprintf(stderr,"Insufficient disk space for data.\n");
         return -1;
@@ -763,9 +886,20 @@ int chdir_myfs(char* dirname){
 
 int open_myfs(char* filename,char mode){
     int fileInode = getfilename_inode(filename);
-    int max_index_1 = vft.max_index;
-    if(fileInode == -1)
+    int max_index_1 = vft.max_index,free_inode_index;
+    inode* tempInode;
+    if(fileInode == -1 && mode == 'r')
         return -1;
+    else if(fileInode == -1 && mode == 'w'){
+        printf("No file with %s name exists. Creating file.\n",filename);
+        free_inode_index = getfreeindex(vfs.sb.mask.free_inode_bitmask,vfs.sb.mask.inode_bitmask_size); 
+        tempInode = &vfs.inodeList[free_inode_index];
+        initInode(tempInode);
+        tempInode->filetype_permission[0] = 0x01; 
+        insertFileInode(pwd_inode,filename,free_inode_index);
+        fileInode = free_inode_index;
+        syncSB(&vfs.sb);
+    }
     if(vft.max_index == 0){
         vft.ft = (file_table_entry*) malloc(sizeof(file_table_entry));
         vft.ft[0].offset = -1;
@@ -808,8 +942,9 @@ int eof_myfs(int fd){
 
 int read_myfs(int fd,int nbytes, char* buf){
     char* point = buf;
-    int offset = vft.ft[fd].offset, dIndex, dIndex_1, dIndex_2;
-    int fileInode = vft.ft[fd].fileInode,base, i1, i2, temp, bytes_read = 0;
+    int offset = vft.ft[fd].offset, dIndex, dIndex_1, dIndex_2, offset_;
+    offset_ = offset;
+    int fileInode = vft.ft[fd].fileInode,base, i1, i2, temp, bytes_read = 0,bytes_to_read;
     inode * inodeTemp;
     int blocksize = vfs.sb.sb.blocksize;
     int index,upper_bound = blocksize;
@@ -819,16 +954,17 @@ int read_myfs(int fd,int nbytes, char* buf){
     index = ceil(double(inodeTemp->file_size)/blocksize);
     i1 = offset/blocksize;
     i2 = ceil(double(offset + nbytes)/blocksize);
-    printf("filesize: %d i1 : %d , i2 : %d\n",inodeTemp->file_size,i1,i2);
+    //printf("Reading in file with offset %d and %d bytes and filesize%d\n",offset,nbytes,inodeTemp->file_size);
     base = i1;
     while(base < index && base < i2){
         if(base < 8){
             dIndex = inodeTemp->dataList[base];
             if(base == i2-1){
-                temp = ((offset + nbytes < inodeTemp->file_size) ? (offset + nbytes) : (inodeTemp->file_size));
-                bcopy(vfs.db[dIndex].data+ offset%blocksize, point, (temp)%blocksize - offset%blocksize );
-                bytes_read += (temp)%blocksize - offset%blocksize;
-                offset += (temp)%blocksize - offset%blocksize;
+                temp = ((offset_ + nbytes < inodeTemp->file_size) ? (offset_ + nbytes) : (inodeTemp->file_size));
+                bytes_to_read = (temp - offset)%blocksize;
+                bcopy(vfs.db[dIndex].data+ offset%blocksize, point,  bytes_to_read);
+                bytes_read += bytes_to_read;
+                offset += bytes_to_read;
                 base += 1;
                 vft.ft[fd].offset = offset;
                 return bytes_read;
@@ -847,10 +983,11 @@ int read_myfs(int fd,int nbytes, char* buf){
             dIndex = inodeTemp->dataList[8];
             dIndex_1 = *((int*)(vfs.db[dIndex].data + (base-8)*4));
             if(base == i2-1){
-                temp = ((offset + nbytes < inodeTemp->file_size) ? (offset + nbytes) : (inodeTemp->file_size));
-                bcopy(vfs.db[dIndex_1].data+ offset%blocksize, point, (temp)%blocksize - offset%blocksize );
-                bytes_read += (temp)%blocksize - offset%blocksize;
-                offset += (temp)%blocksize - offset%blocksize;
+                temp = ((offset_ + nbytes < inodeTemp->file_size) ? (offset_ + nbytes) : (inodeTemp->file_size));
+                bytes_to_read = (temp - offset)%blocksize;
+                bcopy(vfs.db[dIndex_1].data+ offset%blocksize, point, bytes_to_read );
+                bytes_read += bytes_to_read;
+                offset += bytes_to_read;
                 base += 1;
                 vft.ft[fd].offset = offset;
                 return bytes_read;
@@ -870,10 +1007,11 @@ int read_myfs(int fd,int nbytes, char* buf){
             dIndex_1 = *((int*)(vfs.db[dIndex].data + ((base-72)/64)*4));
             dIndex_2 = *((int*)(vfs.db[dIndex_1].data + ((base-72)%64)*4));
             if(base == i2-1){
-                temp = ((offset + nbytes < inodeTemp->file_size) ? (offset + nbytes) : (inodeTemp->file_size));
-                bcopy(vfs.db[dIndex_2].data+ offset%blocksize, point, (temp)%blocksize - offset%blocksize );
-                bytes_read += (temp)%blocksize - offset%blocksize;
-                offset += (temp)%blocksize - offset%blocksize;
+                temp = ((offset_ + nbytes < inodeTemp->file_size) ? (offset_ + nbytes) : (inodeTemp->file_size));
+                bytes_to_read = (temp - offset)%blocksize;
+                bcopy(vfs.db[dIndex_2].data+ offset%blocksize, point, bytes_to_read );
+                bytes_read += bytes_to_read;
+                offset += bytes_to_read;
                 base += 1;
                 vft.ft[fd].offset = offset;
                 return bytes_read;
@@ -898,104 +1036,91 @@ int read_myfs(int fd,int nbytes, char* buf){
 
 int write_myfs(int fd,int nbytes, char* buf){
     char* point = buf;
+    int offset_;
     int offset = vft.ft[fd].offset, dIndex, dIndex_1, dIndex_2;
-    int fileInode = vft.ft[fd].fileInode,base, i1, i2, temp, bytes_read = 0;
+    offset_ = offset;
+    int fileInode = vft.ft[fd].fileInode,base, i1, i2, temp, bytes_read = 0,free_db_index;
     inode * inodeTemp;
     int* x;
     int blocksize = vfs.sb.sb.blocksize;
-    int index,upper_bound = blocksize;
+    int index,upper_bound = blocksize,bytes_to_write;
     if(vft.ft[fd].mode != int('w'))  
         return -1;
+
     inodeTemp = &vfs.inodeList[fileInode];
     index = ceil(double(inodeTemp->file_size)/blocksize);
     i1 = offset/blocksize;
     i2 = ceil(double(offset + nbytes)/blocksize);
-    printf("filesize: %d i1 : %d , i2 : %d\n",inodeTemp->file_size,i1,i2);
+    //printf("Writing in file with offset %d and %d bytes and filesize%d\n",offset,nbytes,inodeTemp->file_size);
     base = i1;
+    while(i2 > index){
+        //printf("Creating a datablock.\n");
+        free_db_index = getfreeindex(vfs.sb.mask.free_disk_bitmask,vfs.sb.mask.disk_bitmask_size);
+        bzero(vfs.db[free_db_index].data,blocksize);
+        insertDataIndex(inodeTemp,free_db_index); 
+        if(index < i2 - 1)
+            inodeTemp->file_size += blocksize;
+        else
+            inodeTemp->file_size = offset + nbytes;    
+        index++;
+    }
+    if(inodeTemp->file_size < offset+nbytes)
+        inodeTemp->file_size = offset + nbytes;
+    syncSB(&vfs.sb);
     while(base < i2){
         if(base < 8){
+            dIndex = inodeTemp->dataList[base];
             if(base == i2-1){
-                dIndex = inodeTemp->dataList[base];
-                temp = ((offset + nbytes < inodeTemp->file_size) ? (offset + nbytes) : (inodeTemp->file_size));
-                bcopy(point, vfs.db[dIndex].data+ offset%blocksize, (temp)%blocksize - offset%blocksize );
-                bytes_read += (temp)%blocksize - offset%blocksize;
-                offset += (temp)%blocksize - offset%blocksize;
-                base += 1;
-                return bytes_read;
+                temp = offset + nbytes;
+                bytes_to_write = (offset_+nbytes-offset)%blocksize;
+                bcopy(point, vfs.db[dIndex].data+ offset%blocksize, bytes_to_write );
+                bytes_read += bytes_to_write;
+                offset += bytes_to_write;
             }
             else{
-                if(base > index-1)
-                    inodeTemp->dataList[base] = getfreeindex(vfs.sb.mask.free_disk_bitmask,vfs.sb.mask.disk_bitmask_size);
-                dIndex = inodeTemp->dataList[base];
+                bytes_to_write = blocksize - offset%blocksize;
                 bcopy(point, vfs.db[dIndex].data+ offset%blocksize, blocksize - offset%blocksize );
                 point += blocksize - offset%blocksize;
                 bytes_read += blocksize - offset%blocksize;
-                offset += blocksize - offset%blocksize;
-                base += 1;
+                offset += blocksize - offset%blocksize;                
             }
         }
         else if(base < 72){
+            dIndex = inodeTemp->dataList[8];
+            dIndex_1 = *((int*)(vfs.db[dIndex].data + (base-8)*4));                
             if(base == i2-1){
-                dIndex = inodeTemp->dataList[8];
-                dIndex_1 = *((int*)(vfs.db[dIndex].data + (base-8)*4));
-                temp = ((offset + nbytes < inodeTemp->file_size) ? (offset + nbytes) : (inodeTemp->file_size));
-                bcopy(point, vfs.db[dIndex_1].data+ offset%blocksize, (temp)%blocksize - offset%blocksize );
-                bytes_read += (temp)%blocksize - offset%blocksize;
-                offset += (temp)%blocksize - offset%blocksize;
-                base += 1;
-                return bytes_read;
+                temp = (offset + nbytes);
+                bytes_to_write = (offset_+nbytes-offset)%blocksize;
+                bcopy(point, vfs.db[dIndex_1].data+ offset%blocksize, bytes_to_write );
+                bytes_read += bytes_to_write;
+                offset += bytes_to_write;                
             }
             else{
-                dIndex = inodeTemp->dataList[8];
-                if(base > index-1){
-                    x = (int*)(vfs.db[dIndex].data + (base-8)*4);
-                    *x = getfreeindex(vfs.sb.mask.free_disk_bitmask,vfs.sb.mask.disk_bitmask_size);
-                }
-                
-                dIndex_1 = *((int*)(vfs.db[dIndex].data + (base-8)*4));
                 bcopy(point, vfs.db[dIndex_1].data+ offset%blocksize, blocksize - offset%blocksize );
                 point += blocksize - offset%blocksize;
                 bytes_read += blocksize - offset%blocksize;
                 offset += blocksize - offset%blocksize;
-                base += 1;
             }
         }
-        else{
+        else{            
+            dIndex = inodeTemp->dataList[9];
+            dIndex_1 = *((int*)(vfs.db[dIndex].data + ((base-72)/64)*4));
+            dIndex_2 = *((int*)(vfs.db[dIndex_1].data + ((base-72)%64)*4));
             if(base == i2-1){
-                dIndex = inodeTemp->dataList[9];
-                dIndex_1 = *((int*)(vfs.db[dIndex].data + ((base-72)/64)*4));
-                dIndex_2 = *((int*)(vfs.db[dIndex_1].data + ((base-72)%64)*4));
-                temp = ((offset + nbytes < inodeTemp->file_size) ? (offset + nbytes) : (inodeTemp->file_size));
-                bcopy(point, vfs.db[dIndex_2].data+ offset%blocksize, (temp)%blocksize - offset%blocksize );
-                bytes_read += (temp)%blocksize - offset%blocksize;
-                offset += (temp)%blocksize - offset%blocksize;
-                base += 1;
-                return bytes_read;
+                temp = (offset + nbytes) ;
+                bytes_to_write = (offset_+nbytes-offset)%blocksize;
+                bcopy(point, vfs.db[dIndex_2].data+ offset%blocksize, bytes_to_write );
+                bytes_read += bytes_to_write;
+                offset += bytes_to_write;
             }
             else{
-                dIndex = inodeTemp->dataList[9];
-                if(base > index-1 && (base-72)%64 == 0){
-                    x = (int*)(vfs.db[dIndex].data + ((base-72)/64)*4);
-                    *x = getfreeindex(vfs.sb.mask.free_disk_bitmask,vfs.sb.mask.disk_bitmask_size);
-                    dIndex_1 = *x;
-                    x = (int*)(vfs.db[dIndex_1].data + ((base-72)%64)*4);
-                    *x = getfreeindex(vfs.sb.mask.free_disk_bitmask,vfs.sb.mask.disk_bitmask_size);
-                    dIndex_2  = *x;
-                }
-                dIndex_1 = *((int*)(vfs.db[dIndex].data + ((base-72)/64)*4));
-                if(base > index-1 && (base-72)%64 != 0){
-                    x = (int*)(vfs.db[dIndex_1].data + ((base-72)/64)*4);
-                    *x = getfreeindex(vfs.sb.mask.free_disk_bitmask,vfs.sb.mask.disk_bitmask_size);
-                }
-                dIndex_2 = *((int*)(vfs.db[dIndex_1].data + ((base-72)%64)*4));
                 bcopy(point, vfs.db[dIndex_2].data+ offset%blocksize, blocksize - offset%blocksize );
                 point += blocksize - offset%blocksize;
                 bytes_read += blocksize - offset%blocksize;
                 offset += blocksize - offset%blocksize;
-                base += 1;
             }
         }
-        //printf("Base %d\n",base);
+        base += 1;
     }
     vft.ft[fd].offset = offset;
     if(base == index)

@@ -4,28 +4,41 @@
 using namespace std;
 
 int main(){
-    int status;
-    int n = restore_myfs("myfs.backup");
-    printf("Returned %d\n",n);
-    char* buf = (char*) malloc(1024);
-    //if((status = create_myfs(10,512)) == -1)
-    //    cerr << "Error creating filesystem\n";
+    int status,i;
+    int n = restore_myfs("mydump-38.backup"),fd,bytes = 0,number,count = 1;
+    int* array = (int*) malloc(sizeof(int));
+    char* buf_temp = (char*)malloc(100);
+    char* buf = (char*)malloc(1);
     status_myfs();
-    showfile_myfs("myfs2.h");
-    chdir_myfs("buridi");
-    ls_myfs();
-    chdir_myfs("..");
-    ls_myfs();
-    status_myfs();
-    int fd = open_myfs("myfs2.h",'r');
-    printf("File descriptor : %d\n",fd);
-    int bytes = read_myfs(fd,1023,buf);
+    showfile_myfs("mytest.txt");
+    fd = open_myfs("mytest.txt",'r');    
+    
+    while(eof_myfs(fd) == 0){
+        bytes += read_myfs(fd,1,buf);
+        //printf("bytes %d\n",bytes);
+    }
+    close_myfs(fd);
+    
+    free(buf);
+    buf = (char*) malloc(bytes+1);
+    fd = open_myfs("mytest.txt",'r');    
+    read_myfs(fd,bytes,buf);
+    close_myfs(fd);
     buf[bytes] = '\0';
-    printf("%s\n",buf);
-    printf("\nbytes read : %d\n",bytes);
-    bytes = read_myfs(fd,1023,buf);
-    buf[bytes] = '\0';
-    printf("%s\n",buf);
-    printf("\nbytes read : %d\n",bytes);
+    
+    while(bytes != 0){
+        sscanf(buf,"%d\n",&number);
+        sprintf(buf_temp,"%d\n",number);
+        array[count-1] = number;
+        count++;
+        bytes -= strlen(buf_temp);
+        buf += strlen(buf_temp);
+        //printf("%d\n", number);
+        array = (int*)realloc(array,sizeof(int)*count);
+    }
+
+    sort(array,array+count-1);
+    for(i = 0; i < count-1; i++)
+        printf("%d\n",array[i]);
     return 0;
 }
