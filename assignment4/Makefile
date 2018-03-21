@@ -1,7 +1,13 @@
-build: main restore 
+build: t1 t2 t3 t4
 
-main:
-	g++ test.cpp -o test
+t1:
+	gcc testcase1.c -lm -lpthread -o testcase1
 
-restore: 
-	g++ test_restore.cpp -o test_restore
+t2:
+	gcc testcase2.c -lm -lpthread -o testcase2
+
+t3:
+	gcc testcase3.c -lm -lpthread -o testcase3
+
+t4:
+	gcc testcase4.c -lm -lpthread -o testcase4
