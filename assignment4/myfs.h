@@ -7,7 +7,7 @@
 #include <sys/shm.h>
 #include <sys/ipc.h>
 #include <fcntl.h>
-
+#include <stdlib.h>
 #define BLOCKSIZE 256
 
 // These data structures for creating a virtual file system in the user space and modify and update the actual file system by synchronizing
