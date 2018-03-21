@@ -6,7 +6,7 @@
 #include <semaphore.h>
 #include <sys/shm.h>
 #include <sys/ipc.h>
-
+#include <stdlib.h>
 #define BLOCKSIZE 256
 
 // These data structures for creating a virtual file system in the user space and modify and update the actual file system by synchronizing
@@ -166,7 +166,7 @@ int create_myfs(int size,int max_inodes){
     int i, no_of_data_blocks;
     char* myfs_;
 
-    sem_open("/tmp/sem",O_CREAT,S_IRWXU,1);
+    sem_open("/tmp/sem",IPC_CREAT,S_IRWXU,1);
     shmid = shmget(IPC_PRIVATE,(size*1024*1024),IPC_CREAT|0700);
     if(shmid == -1)
         perror("Unable to get shared memory.\n");
