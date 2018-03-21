@@ -25,7 +25,7 @@ int main(){
     copy_pc2myfs("myfs.h","myfs9.h");
     copy_pc2myfs("myfs.h","myfs10.h");
     copy_pc2myfs("myfs.h","myfs11.h");
-    copy_pc2myfs("test.cpp","test.cpp");
+    copy_pc2myfs("testcase4.c","test.cpp");
 
     // LISTING CURRENT DIRECTORY
     ls_myfs();

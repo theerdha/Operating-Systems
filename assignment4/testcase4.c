@@ -27,7 +27,7 @@ int main(){
 	    sync_shared_myfs(); 
 
         chdir_myfs("mycode");
-        copy_pc2myfs("test.cpp","test.cpp");
+        copy_pc2myfs("testcase1.c","test.cpp");
         ls_myfs();
         showfile_myfs("test.cpp");
         shmdt(myfs);

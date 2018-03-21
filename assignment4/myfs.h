@@ -203,6 +203,14 @@ int create_myfs(int size,int max_inodes){
     vfs.sb.sb.used_disk_blocks = 1;
     vfs.sb.mask.disk_bitmask_size = ceil(((double)vfs.blocks_for_datablocks)/8);
     vfs.sb.mask.inode_bitmask_size = ceil(((double)vfs.blocks_for_inodelist)/8);
+    /*
+    myfs_ = myfs;
+    myfs_ += sizeof(superblock_); 
+    vfs.sb.mask.free_disk_bitmask = myfs_;
+    myfs_ += vfs.sb.mask.disk_bitmask_size;
+    vfs.sb.mask.free_inode_bitmask = myfs_;    
+    myfs_ += vfs.sb.mask.inode_bitmask_size;
+    */
     vfs.sb.mask.free_disk_bitmask = (char*)malloc(vfs.sb.mask.disk_bitmask_size);
     vfs.sb.mask.free_inode_bitmask = (char*) malloc(vfs.sb.mask.inode_bitmask_size);
     bzero(vfs.sb.mask.free_disk_bitmask,vfs.sb.mask.disk_bitmask_size);
@@ -210,6 +218,7 @@ int create_myfs(int size,int max_inodes){
     vfs.sb.mask.free_inode_bitmask[0] = 0x80; 
     vfs.sb.mask.free_disk_bitmask[0] = 0x80;
     syncSB(&vfs.sb);
+   
     //printf("inode size %d\n",sizeof(inode));
     //printf("Created superblock with %d blocks\n", vfs.blocks_for_superblock);
     //printf("Created inode list with %d blocks\n", vfs.blocks_for_inodelist);
@@ -1155,10 +1164,12 @@ int dump_myfs(char* dumpfile){
     FILE* fd = fopen(dumpfile,"w+");
     int n = fwrite(myfs,1,vfs.sb.sb.filesystem_size,fd);
     fclose(fd);
+    printf("######## Creating backup for MRFS filesystem FILE NAME : %s\n",dumpfile);
     return n;
 }
 
 int restore_myfs(char* dumpfile){
+    printf("######## Restoring backup for MRFS filesystem FILE NAME : %s\n",dumpfile);
     FILE* fd = fopen(dumpfile,"r");
     struct stat st;
     stat(dumpfile,&st);
