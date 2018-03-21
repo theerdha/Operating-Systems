@@ -1,6 +1,7 @@
 #include <unistd.h>
-#include "myfs.h"
 #include <sys/wait.h>
+#include "myfs.h"
+
 int main(){
 	int status,x,n,fd,number, bytes;
     char* buf = (char*) malloc(1024);
