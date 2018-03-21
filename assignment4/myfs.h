@@ -78,7 +78,7 @@ int pwd_inode = 0; // Present working directory inode
 filesystem vfs;
 filetable vft;
 int shmid;
-sem_t sem;
+sem_t* sem;
 
 /* 
  * Synchronization operations for superblock, inodes and datablock   
@@ -167,7 +167,7 @@ int create_myfs(int size,int max_inodes){
     int i, no_of_data_blocks;
     char* myfs_;
 
-    sem = *(sem_open("/tmp/sem",O_CREAT|O_EXCL,S_IRWXU,1));
+    sem = sem_open("/tmp/sem",O_CREAT|O_EXCL,S_IRWXU,1);
     shmid = shmget(IPC_PRIVATE,(size*1024*1024),IPC_CREAT|0700);
     if(shmid == -1)
         perror("Unable to get shared memory.\n");
