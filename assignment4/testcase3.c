@@ -12,9 +12,9 @@ int main(){
     char* buf_temp = (char*)malloc(100);
     char* buf = (char*)malloc(1);
     status_myfs();
+    ls_myfs();
     showfile_myfs("mytest.txt");
     fd = open_myfs("mytest.txt",'r');    
-    
     while(eof_myfs(fd) == 0){
         bytes += read_myfs(fd,1,buf);
         //printf("bytes %d\n",bytes);
@@ -40,8 +40,15 @@ int main(){
     }
 
     qsort(array,count-1,4,comp);
-    for(i = 0; i < count-1; i++)
-        printf("%d\n",array[i]);
+
+    fd = open_myfs("sorted.txt",'w');
+    for(i = 0; i < count-1; i++){
+        sprintf(buf_temp,"%d\n",array[i]);
+        write_myfs(fd,strlen(buf_temp),buf_temp);
+    }
+    close_myfs(fd);
+    ls_myfs();
+    showfile_myfs("sorted.txt");
 
     sem_close(sem_inode);
     sem_close(mut_inode);

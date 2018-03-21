@@ -1306,7 +1306,7 @@ int read_myfs(int fd,int nbytes, char* buf){
     }
     sem_post(mut_inode);
 
-    if(base == index || base == i2 -1)
+    if(base == index || base == i2)
         return bytes_read;
    
     return -1;
@@ -1427,9 +1427,9 @@ int dump_myfs(char* dumpfile){
 
 int restore_myfs(char* dumpfile){
     printf("######## Restoring backup for MRFS filesystem FILE NAME : %s\n",dumpfile);
-    FILE* fd = fopen(dumpfile,"r");
     struct stat st;
     stat(dumpfile,&st);
+    FILE* fd = fopen(dumpfile,"r");
     int n;
     char* myfs_;
 
@@ -1445,7 +1445,7 @@ int restore_myfs(char* dumpfile){
         exit(1);
     }
 
-    shmid = shmget(IPC_PRIVATE,(st.st_size*1024*1024),IPC_CREAT|0700);
+    shmid = shmget(IPC_PRIVATE,st.st_size,IPC_CREAT|0700);
     shmid_1 = shmget(IPC_PRIVATE,4,IPC_CREAT|0700);
     shmid_2 = shmget(IPC_PRIVATE,4,IPC_CREAT|0700);
     shmid_3 = shmget(IPC_PRIVATE,4,IPC_CREAT|0700);
@@ -1453,11 +1453,12 @@ int restore_myfs(char* dumpfile){
         perror("Unable to get shared memory.\n");
     
     myfs = (char*)shmat(shmid,0,0); 
-    n = fread(myfs,st.st_size,1,fd);
     inode_sem_no = (int*)shmat(shmid_1,0,0); 
     data_sem_no = (int*)shmat(shmid_2,0,0); 
     super_sem_no = (int*)shmat(shmid_3,0,0); 
     
+    n = fread(myfs,st.st_size,1,fd);
+
     *inode_sem_no = 0;
     *data_sem_no = 0;
     *super_sem_no = 0;

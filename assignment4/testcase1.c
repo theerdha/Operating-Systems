@@ -85,6 +85,5 @@ int main(){
     shmdt(super_sem_no);
     shmctl(shmid_3,IPC_RMID,NULL);
 
-    
   	return 0;
 }
