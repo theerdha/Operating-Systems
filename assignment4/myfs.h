@@ -6,6 +6,7 @@
 #include <semaphore.h>
 #include <sys/shm.h>
 #include <sys/ipc.h>
+#include <fcntl.h>
 
 #define BLOCKSIZE 256
 
@@ -77,7 +78,7 @@ int pwd_inode = 0; // Present working directory inode
 filesystem vfs;
 filetable vft;
 int shmid;
-sem_t* sem;
+sem_t sem;
 
 /* 
  * Synchronization operations for superblock, inodes and datablock   
@@ -166,7 +167,7 @@ int create_myfs(int size,int max_inodes){
     int i, no_of_data_blocks;
     char* myfs_;
 
-    sem_open("/tmp/sem",O_CREAT,S_IRWXU,1);
+    sem = *(sem_open("/tmp/sem",O_CREAT|O_EXCL,S_IRWXU,1));
     shmid = shmget(IPC_PRIVATE,(size*1024*1024),IPC_CREAT|0700);
     if(shmid == -1)
         perror("Unable to get shared memory.\n");
@@ -1190,6 +1191,27 @@ int restore_myfs(char* dumpfile){
     return n;
 }
 
-int sync_shared_myfs(char* myfs_shared){
+void sync_shared_myfs(){
+    char* myfs_;
+    vft.max_index = 0;
+
+    vfs.sb.sb = *((superblock_*)(myfs));
+    //printf("size %d\n",vfs.sb.sb.blocksize);
+    vfs.blocks_for_datablocks = vfs.sb.sb.max_disk_blocks;
+    vfs.blocks_for_inodelist = vfs.sb.sb.max_inodes;
+    vfs.blocks_for_superblock = (vfs.sb.sb.filesystem_size/vfs.sb.sb.blocksize) - vfs.blocks_for_datablocks - vfs.blocks_for_inodelist;
+    vfs.sb.mask.disk_bitmask_size = ceil(((double)vfs.blocks_for_datablocks)/8);
+    vfs.sb.mask.inode_bitmask_size = ceil(((double)vfs.blocks_for_inodelist)/8);
+    vfs.sb.mask.free_disk_bitmask = (char*)malloc(vfs.sb.mask.disk_bitmask_size);
+    vfs.sb.mask.free_inode_bitmask = (char*) malloc(vfs.sb.mask.inode_bitmask_size);
+    myfs_ = myfs;
+    myfs_ += sizeof(superblock_);
+    bcopy(myfs_, vfs.sb.mask.free_disk_bitmask,vfs.sb.mask.disk_bitmask_size);
+    myfs_ += vfs.sb.mask.disk_bitmask_size;
+    bcopy(myfs_, vfs.sb.mask.free_inode_bitmask,vfs.sb.mask.inode_bitmask_size);
+    myfs_ += vfs.sb.mask.inode_bitmask_size;
+
+    vfs.inodeList = (inode*)(myfs + vfs.sb.sb.blocksize*vfs.blocks_for_superblock);
+    vfs.db = (datablock*)(myfs + vfs.sb.sb.blocksize*(vfs.blocks_for_superblock+vfs.blocks_for_inodelist));
 
 }
