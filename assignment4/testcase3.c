@@ -42,5 +42,36 @@ int main(){
     qsort(array,count-1,4,comp);
     for(i = 0; i < count-1; i++)
         printf("%d\n",array[i]);
+
+    sem_close(sem_inode);
+    sem_close(mut_inode);
+
+    sem_close(sem_data);
+    sem_close(mut_data);
+    
+    sem_close(sem_super);
+    sem_close(mut_super);
+    
+
+    sem_unlink("sem_inode_2");
+    sem_unlink("mut_inode_2");
+    sem_unlink("sem_super_2");
+    sem_unlink("mut_super_2");
+    sem_unlink("sem_data_2");
+    sem_unlink("mut_data_2");
+
+    shmdt(myfs);
+    shmctl(shmid,IPC_RMID,NULL);
+
+    shmdt(inode_sem_no);
+    shmctl(shmid_1,IPC_RMID,NULL);
+
+    shmdt(data_sem_no);
+    shmctl(shmid_2,IPC_RMID,NULL);
+
+    shmdt(super_sem_no);
+    shmctl(shmid_3,IPC_RMID,NULL);
+
+
     return 0;
 }

@@ -22,8 +22,6 @@ int main(){
     x = fork();
     if(x == 0){
         printf("\n######### Child Process active ##########\n");
-    	sem = sem_open("/tmp/sem",O_EXCL,S_IRWXU,1);
-	    myfs = (char*)shmat(shmid,0,0);
 	    sync_shared_myfs(); 
 
         chdir_myfs("mycode");
@@ -31,6 +29,13 @@ int main(){
         ls_myfs();
         showfile_myfs("test.cpp");
         shmdt(myfs);
+
+        shmdt(inode_sem_no);
+
+        shmdt(data_sem_no);
+
+        shmdt(super_sem_no);
+
         exit(0);
     }
     else{
@@ -51,5 +56,35 @@ int main(){
         wait(NULL);
         shmdt(myfs);
     }
+    
+    sem_close(sem_inode);
+    sem_close(mut_inode);
+
+    sem_close(sem_data);
+    sem_close(mut_data);
+    
+    sem_close(sem_super);
+    sem_close(mut_super);
+    
+
+    sem_unlink("sem_inode_2");
+    sem_unlink("mut_inode_2");
+    sem_unlink("sem_super_2");
+    sem_unlink("mut_super_2");
+    sem_unlink("sem_data_2");
+    sem_unlink("mut_data_2");
+    
+    shmdt(myfs);
     shmctl(shmid,IPC_RMID,NULL);
+
+    shmdt(inode_sem_no);
+    shmctl(shmid_1,IPC_RMID,NULL);
+
+    shmdt(data_sem_no);
+    shmctl(shmid_2,IPC_RMID,NULL);
+
+    shmdt(super_sem_no);
+    shmctl(shmid_3,IPC_RMID,NULL);
+
+    return 1;
 }
