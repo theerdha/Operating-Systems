@@ -11,6 +11,9 @@
 #define BLOCKSIZE 256
 
 // These data structures for creating a virtual file system in the user space and modify and update the actual file system by synchronizing
+// Motivated from kernel virtual file system data structures
+// superblock_ and superblock_additional are seperated as we can easily type cast superblock_ and write in memory and we cannot do the same with
+// superblock_additional as it contains pointers to arrays
 typedef struct superblock_{
     int filesystem_size;
     int blocksize;
@@ -33,6 +36,7 @@ typedef struct superblock{
 } superblock;
 
 // Data structure of inode
+// Specification as explained in Lab and Assignment problem statement
 typedef struct inode{
     int file_size;
     int dataList[10];
@@ -48,40 +52,44 @@ typedef struct datablock{
 
 // Virtual file system
 typedef struct filesystem{
-    superblock sb;
-    inode* inodeList;
-    datablock* db;
+    superblock sb; // Super block
+    inode* inodeList; // Inode List
+    datablock* db; // Data blocks
+    // just for convenience
     int blocks_for_superblock;
     int blocks_for_inodelist;
     int blocks_for_datablocks;
 } filesystem;
 
 // File Table entry
+// For keeping track for open file's identified by file inodes
 typedef struct file_table_entry{
-    int fileInode;
-    int mode;
-    int offset;
+    int fileInode; // Inode index corresponds to the file
+    int mode; // Tells read or write mode
+    int offset; // Offset till which read or write is done
 } file_table_entry;
 
 // FILE TABLE
 typedef struct filetable{
-    file_table_entry* ft;
-    int max_index;
+    file_table_entry* ft; // file descriptor acts as the index to this array
+    int max_index; // Tells the highest file descriptor used effectively telling the size of the above array
 } filetable;
 
 /*
  * Global variables
  */
 
-char* myfs; // Actual In memory File system 
+char* myfs; // Actual In memory File system
 int pwd_inode = 0; // Present working directory inode
-filesystem vfs;
-filetable vft;
-int shmid;
-int shmid_1;
-int shmid_2;
-int shmid_3;
+filesystem vfs; // Instance of file system
+filetable vft; // Instance of file table
+int shmid; // Shared memory id for Memory resident file system
+int shmid_1; // Shared memory for inode_sem_no
+int shmid_2;  // Shared memory for data_sem_no
+int shmid_3;  // Shared memory for super_sem_no
 
+// Semaphores for reader writer problem. Check class notes for details
+// Considered inode list, super block and data blocks as seperate shared memory and used different semaphores for each
 sem_t* sem_inode;
 sem_t* mut_inode;
 int *inode_sem_no;
@@ -94,35 +102,37 @@ sem_t* sem_super;
 sem_t* mut_super;
 int* super_sem_no;
 
-/* 
- * Synchronization operations for superblock, inodes and datablock   
+/*
+ * Synchronization operations for superblock, inodes and datablock
  */
 
 // Initialize Inode
-
 void initInode(inode* in){
     int i;
     time_t currenttime;
     struct tm* local_time;
-
-    in->filetype_permission[0] = 0x03; 
-    in->filetype_permission[1] = 0xFF; 
+    // 0x corresponds to hexadecimal notatoin i.e 4 bits so 0x03 corresponds to the binary number 0000 0011 (8 bits) and note 1 char is 8 bits.
+    in->filetype_permission[0] = 0x03;
+    in->filetype_permission[1] = 0xFF;
     currenttime = time(NULL);
     local_time = localtime(&currenttime);
+    // Converts struct tm into a char* i.e string
     asctime_r(local_time, in->timeLastModified);
     asctime_r(local_time, in->timeLastRead);
     in->file_size = 0;
 }
 
 // Synchronize super block with filesystem superblock
+// When ever we update the superblock we need to update the superblock present in the memory resident file system
 void syncSB(superblock* sb){
-
+    // Acquire lock on super block
     sem_wait(sem_super);
-
+    // Store the superblock_ segment in MRFS
     superblock_* sb_ = (superblock_*) myfs;
     *sb_ = (sb->sb);
     char* myfs_ = myfs;
-    
+
+    // Store the array data in the MRFS
     myfs_ += sizeof(superblock_);
     bcopy(sb->mask.free_disk_bitmask,myfs_,sb->mask.disk_bitmask_size);
     myfs_ += sb->mask.disk_bitmask_size;
@@ -141,6 +151,9 @@ void syncSB(superblock* sb){
     return;
 }
 
+
+// ########################## IGNORE THE COMMENTED CODE BELOW  #######################################
+
 // Synchronize inode with given index
 /*
 void //syncInode(superblock* sb,inode* in,int index){
@@ -155,7 +168,7 @@ void //syncInode(superblock* sb,inode* in,int index){
     printf("1. %d\n",*((int*)(myfs_)));
     printf("2. %d\n",*((int*)(myfs_+4)));
     printf("3. %d\n",*((char*)(myfs_+44)));
-    
+
     return;
 }
 */
@@ -167,50 +180,53 @@ void syncdata(superblock* sb, datablock* db, int index){
     myfs_ += sb->sb.blocksize*(vfs.blocks_for_superblock+vfs.blocks_for_inodelist + index);
     db_ = (datablock*)myfs_;
     *db_ = *db;
-    
+
     printf("1. %s\n",myfs_);
     printf("2. %d\n",*(unsigned int*)(myfs_+30));
     printf("3. %s\n",myfs_ + 32);
     printf("4. %d\n",*(unsigned int*)(myfs_+62));
-    
+
     return;
 }
 */
+// ################################################################################################
 
 // Assuming the system to be byte addressable
 int create_myfs(int size,int max_inodes){
     // Size is measured in Mbytes
-    // max_inodes gives no of inode blocks 
+    // max_inodes gives no of inode blocks
     time_t currenttime;
     struct tm* local_time;
     int i, no_of_data_blocks;
     char* myfs_;
-
+    // Create named semaphores Read about named semaphores in man page
     sem_inode = sem_open("sem_inode_2",O_CREAT|O_EXCL,S_IRWXU,1);
     mut_inode = sem_open("mut_inode_2",O_CREAT|O_EXCL,S_IRWXU,1);
     sem_super = sem_open("sem_super_2",O_CREAT|O_EXCL,S_IRWXU,1);
     mut_super = sem_open("mut_super_2",O_CREAT|O_EXCL,S_IRWXU,1);
     sem_data = sem_open("sem_data_2",O_CREAT|O_EXCL,S_IRWXU,1);
     mut_data = sem_open("mut_data_2",O_CREAT|O_EXCL,S_IRWXU,1);
-    
+
+    // Error checking
     if((sem_inode == (void *)-1) || (mut_inode == (void *)-1) || (sem_inode == (void *)-1) || (sem_super == (void *)-1) || (mut_inode == (void *)-1) || (mut_super == (void *)-1)) {
         printf("sem_open() failed");
         exit(1);
     }
 
-
+    // Create shared memory segments
     shmid = shmget(IPC_PRIVATE,(size*1024*1024),IPC_CREAT|0700);
     shmid_1 = shmget(IPC_PRIVATE,4,IPC_CREAT|0700);
     shmid_2 = shmget(IPC_PRIVATE,4,IPC_CREAT|0700);
     shmid_3 = shmget(IPC_PRIVATE,4,IPC_CREAT|0700);
     if(shmid == -1)
         perror("Unable to get shared memory.\n");
-    
-    myfs = (char*)shmat(shmid,0,0); 
-    inode_sem_no = (int*)shmat(shmid_1,0,0); 
-    data_sem_no = (int*)shmat(shmid_2,0,0); 
-    super_sem_no = (int*)shmat(shmid_3,0,0); 
-    
+
+    // Attaching shared memory and storing the pointer in appropriate variables
+    myfs = (char*)shmat(shmid,0,0);
+    inode_sem_no = (int*)shmat(shmid_1,0,0);
+    data_sem_no = (int*)shmat(shmid_2,0,0);
+    super_sem_no = (int*)shmat(shmid_3,0,0);
+
     *inode_sem_no = 0;
     *data_sem_no = 0;
     *super_sem_no = 0;
@@ -220,27 +236,33 @@ int create_myfs(int size,int max_inodes){
         fprintf(stderr,"Error allocating memory\n");
         return -1;
     }
-
+    // Computing the file system size and initializing the super block instance
     myfs_ = myfs;
     vft.max_index = 0;
     vfs.sb.sb.filesystem_size = size * 1024 * 1024;
     vfs.sb.sb.blocksize = BLOCKSIZE;
-    
-    //vfs.inodeList = (inode*)malloc(sizeof(inode)*max_inodes);
-    
-    vfs.blocks_for_inodelist = max_inodes; 
-    no_of_data_blocks = (size*1024*4 - max_inodes);
-    vfs.blocks_for_datablocks = no_of_data_blocks - ceil(((double) no_of_data_blocks)/(8*vfs.sb.sb.blocksize) + max_inodes/8 + ((double) 20)/vfs.sb.sb.blocksize);
+
+    // IGNORE //vfs.inodeList = (inode*)malloc(sizeof(inode)*max_inodes);
+
+    // Taking each inode required a single block
+    vfs.blocks_for_inodelist = max_inodes;
+
+    // Computing the no of data blocks
+    no_of_data_blocks = (size*1024*4 - max_inodes); // Total blocks - blocks for inodes
+    vfs.blocks_for_datablocks = no_of_data_blocks - ceil(((double) no_of_data_blocks)/(8*vfs.sb.sb.blocksize) + max_inodes/8 +              ((double) 20)/vfs.sb.sb.blocksize); // Above expression - (blocks required for storing the super block data)
+    //                                                                Size of bitmask of data blocks             bitmask size of inode list   size of remaining data in super block
+    // Computing the number of blocks for super block
     vfs.blocks_for_superblock = size*1024*4 - vfs.blocks_for_datablocks - vfs.blocks_for_inodelist;
     myfs_ += BLOCKSIZE*vfs.blocks_for_superblock;
+    // Pointing the inode list pointer in the vfs to mrfs location
     vfs.inodeList = (inode*)myfs_;
     myfs_ = myfs;
     myfs_ += (vfs.blocks_for_inodelist + vfs.blocks_for_superblock)*BLOCKSIZE;
     //vfs.db = (datablock*) malloc(sizeof(datablock)*no_of_data_blocks);
+    // Pointing the data blocks pointer in vfs to mrfs location
     vfs.db = (datablock*)myfs_;
-    
-    /* Initialize super block */
 
+    /* Initialize super block */
     vfs.sb.sb.max_inodes = max_inodes;
     vfs.sb.sb.used_inodes = 1;
     vfs.sb.sb.max_disk_blocks = vfs.blocks_for_datablocks;
@@ -249,26 +271,28 @@ int create_myfs(int size,int max_inodes){
     vfs.sb.mask.inode_bitmask_size = ceil(((double)vfs.blocks_for_inodelist)/8);
     /*
     myfs_ = myfs;
-    myfs_ += sizeof(superblock_); 
+    myfs_ += sizeof(superblock_);
     vfs.sb.mask.free_disk_bitmask = myfs_;
     myfs_ += vfs.sb.mask.disk_bitmask_size;
-    vfs.sb.mask.free_inode_bitmask = myfs_;    
+    vfs.sb.mask.free_inode_bitmask = myfs_;
     myfs_ += vfs.sb.mask.inode_bitmask_size;
     */
     vfs.sb.mask.free_disk_bitmask = (char*)malloc(vfs.sb.mask.disk_bitmask_size);
     vfs.sb.mask.free_inode_bitmask = (char*) malloc(vfs.sb.mask.inode_bitmask_size);
     bzero(vfs.sb.mask.free_disk_bitmask,vfs.sb.mask.disk_bitmask_size);
     bzero(vfs.sb.mask.free_inode_bitmask,vfs.sb.mask.inode_bitmask_size);
-    vfs.sb.mask.free_inode_bitmask[0] = 0x80; 
+    // 0x80 as 1 inode and 1 data block are used for creating root directory inode and root directory data
+    vfs.sb.mask.free_inode_bitmask[0] = 0x80;
     vfs.sb.mask.free_disk_bitmask[0] = 0x80;
 
+    // Sync super block
     syncSB(&vfs.sb);
     //printf("inode size %d\n",sizeof(inode));
     //printf("Created superblock with %d blocks\n", vfs.blocks_for_superblock);
     //printf("Created inode list with %d blocks\n", vfs.blocks_for_inodelist);
     //printf("Created data block with %d blocks\n", vfs.blocks_for_datablocks);
 
-    /* Initializing Root Inode and setting other inodes to null*/
+    /* ######### Initializing Root Inode #############*/
 
     // 2 bytes for access permission and file type d-rwx-rwx-rwx 10 bits so 2 bytes
     inode* in_temp = &vfs.inodeList[0];
@@ -276,7 +300,7 @@ int create_myfs(int size,int max_inodes){
     in_temp->file_size = 32;
     in_temp->dataList[0] = 0;
     //syncInode(&vfs.sb,in_temp,0);
-    
+
     /* Initializing the root directory */
     // Each directory entry is stored as 32 bytes data. 30 bytes for file/directory name and 2 bytes for inode number.
     strcpy(vfs.db[0].data,".");
@@ -340,9 +364,9 @@ int getfreeindex(char* mask, int length){
                 free_index += 7;
             }
             break;
-        }    
+        }
     }
-    sem_post(sem_super);    
+    sem_post(sem_super);
     return free_index;
 }
 
@@ -361,7 +385,7 @@ void insertDataIndex(inode* in,int dIndex){
             free_db_index = getfreeindex(vfs.sb.mask.free_disk_bitmask,vfs.sb.mask.disk_bitmask_size);
             in->dataList[8] = free_db_index;
         }
-        di = in->dataList[8];    
+        di = in->dataList[8];
         x = (int*) (vfs.db[di].data + (index-8)*4);
         *x = dIndex;
         //syncdata(&vfs.sb,&vfs.db[di],di);
@@ -388,7 +412,7 @@ void insertDataIndex(inode* in,int dIndex){
     }
 
     sem_post(sem_data);
-    sem_post(sem_inode);   
+    sem_post(sem_inode);
     return;
 }
 
@@ -505,12 +529,12 @@ void insertFileInode(int pwd_inode_,char* filename,int fileInode){
     tempInode->file_size += 32;
 
     sem_post(sem_data);
-    sem_post(sem_inode); 
+    sem_post(sem_inode);
     return;
 }
 
 int getfilename_inode(char* filename){
-    
+
     sem_wait(mut_inode);
     if((*inode_sem_no) == 0){
         (*inode_sem_no)++;
@@ -524,10 +548,10 @@ int getfilename_inode(char* filename){
         sem_wait(sem_data);
     }
     sem_post(mut_data);
-    
+
     int status = 0;
     inode* inodeTemp = &vfs.inodeList[pwd_inode];
-    int filesize = inodeTemp->file_size,index = 0,offset = 0,dIndex, dIndex_1, dIndex_2, fileIndex = -1;   
+    int filesize = inodeTemp->file_size,index = 0,offset = 0,dIndex, dIndex_1, dIndex_2, fileIndex = -1;
     while(filesize != 0 && status == 0){
         if(index < 8){
             dIndex = inodeTemp->dataList[index];
@@ -575,17 +599,17 @@ int getfilename_inode(char* filename){
             if(offset == vfs.sb.sb.blocksize){
                 offset = 0;
                 index += 1;
-            } 
+            }
         }
     }
-    
+
     sem_wait(mut_data);
     (*data_sem_no)--;
     if((*data_sem_no) == 0){
         sem_post(sem_data);
     }
     sem_post(mut_data);
-    
+
     sem_wait(mut_inode);
     (*inode_sem_no)--;
     if((*inode_sem_no) == 0){
@@ -626,7 +650,7 @@ void restore_index(char* bitmask,int bitmask_size,int index){
 }
 
 int ls_myfs(){
-    
+
     sem_wait(mut_inode);
     if((*inode_sem_no) == 0){
         (*inode_sem_no)++;
@@ -640,10 +664,10 @@ int ls_myfs(){
         sem_wait(sem_data);
     }
     sem_post(mut_data);
-    
+
 
     inode* inodeTemp = &vfs.inodeList[pwd_inode];
-    int filesize = inodeTemp->file_size,index = 0,offset = 0,dIndex, dIndex_1, dIndex_2, fileIndex;    
+    int filesize = inodeTemp->file_size,index = 0,offset = 0,dIndex, dIndex_1, dIndex_2, fileIndex;
     printf("\n#####Listing current directory #######\n");
     //printf("FILESIZE %d\n",filesize);
     while(filesize != 0){
@@ -681,17 +705,17 @@ int ls_myfs(){
             if(offset == vfs.sb.sb.blocksize){
                 offset = 0;
                 index += 1;
-            } 
+            }
         }
     }
-    
+
     sem_wait(mut_data);
     (*data_sem_no)--;
     if((*data_sem_no) == 0){
         sem_post(sem_data);
     }
     sem_post(mut_data);
-    
+
     sem_wait(mut_inode);
     (*inode_sem_no)--;
     if((*inode_sem_no) == 0){
@@ -704,8 +728,8 @@ int ls_myfs(){
 
 char* getInodeOffsetPWD(int index,int offset){
     inode* inodeTemp = &vfs.inodeList[pwd_inode];
-    int filesize = inodeTemp->file_size,dIndex, dIndex_1, dIndex_2, fileIndex; 
-    int status = 0;  
+    int filesize = inodeTemp->file_size,dIndex, dIndex_1, dIndex_2, fileIndex;
+    int status = 0;
     if(index < 8){
         dIndex = inodeTemp->dataList[index];
         return (vfs.db[dIndex].data+offset);
@@ -724,15 +748,15 @@ char* getInodeOffsetPWD(int index,int offset){
 }
 
 int remove_filename_pwd(char* filename){
-    
+
     inode* inodeTemp = &vfs.inodeList[pwd_inode];
-    int filesize = inodeTemp->file_size,index = 0,offset = 0,dIndex, dIndex_1, dIndex_2, fileIndex; 
-    int status = 0;  
+    int filesize = inodeTemp->file_size,index = 0,offset = 0,dIndex, dIndex_1, dIndex_2, fileIndex;
+    int status = 0;
     int pass1,pass2;
     char* da;
     while(filesize != 0){
         if(index < 8){
-            dIndex = inodeTemp->dataList[index];            
+            dIndex = inodeTemp->dataList[index];
             if(status == 1 && filesize != 32){
                 if(offset+32 == vfs.sb.sb.blocksize){
                     pass1 = index+1;
@@ -744,11 +768,11 @@ int remove_filename_pwd(char* filename){
                 }
                 da = getInodeOffsetPWD(pass1,pass2);
                 bcopy(da,vfs.db[dIndex].data + offset,32);
-                
+
             }
             else if(status == 0 && strcmp(vfs.db[dIndex].data+offset,filename) == 0){
                 status = 1 ;
-                continue;  
+                continue;
             }
             else if(filesize == 32){
                 break;
@@ -820,16 +844,16 @@ int remove_filename_pwd(char* filename){
             if(offset == vfs.sb.sb.blocksize){
                 offset = 0;
                 index += 1;
-            } 
+            }
         }
     }
     inodeTemp->file_size -= 32;
-    
+
     return 1;
 }
 
 int rm_myfs(char* filename){
-    
+
     int fileInode = getfilename_inode(filename);
 
     if(fileInode == -1)
@@ -868,7 +892,7 @@ int rm_myfs(char* filename){
     }
     remove_filename_pwd(filename);
     restore_index(vfs.sb.mask.free_inode_bitmask,vfs.sb.mask.inode_bitmask_size,fileInode);
-    
+
     sem_post(sem_data);
     sem_post(sem_inode);
 
@@ -878,20 +902,20 @@ int rm_myfs(char* filename){
 int rmdir_myfs(char* dirname){
 
     int fileInode = getfilename_inode(dirname);
-    
+
     if(fileInode == -1)
         return -1;
-    
+
     sem_wait(sem_inode);
     sem_wait(sem_data);
-    
+
     inode* tempInode = &vfs.inodeList[fileInode];
     if(tempInode->file_size != 64){
         printf("Directory not empty\n");
 
         sem_post(sem_data);
         sem_post(sem_inode);
-        
+
         return -1;
     }
     int dIndex;
@@ -899,7 +923,7 @@ int rmdir_myfs(char* dirname){
     restore_index(vfs.sb.mask.free_disk_bitmask,vfs.sb.mask.disk_bitmask_size,dIndex);
     remove_filename_pwd(dirname);
     restore_index(vfs.sb.mask.free_inode_bitmask,vfs.sb.mask.inode_bitmask_size,fileInode);
-    
+
     sem_post(sem_data);
     sem_post(sem_inode);
 
@@ -910,7 +934,7 @@ int showfile_myfs(char* filename){
 
     int index = 0, dIndex, dIndex_1, dIndex_2;
     int fileInode = getfilename_inode(filename);
-    
+
 
     printf("\n#####Showing File Inode %d with file Name %s#######\n", fileInode,filename);
     if(fileInode == -1)
@@ -929,7 +953,7 @@ int showfile_myfs(char* filename){
         sem_wait(sem_data);
     }
     sem_post(mut_data);
-    
+
     inode* inodeTemp = &vfs.inodeList[fileInode];
     int index_count = ceil(((double)inodeTemp->file_size)/vfs.sb.sb.blocksize);
     //printf("Max inodes to get %d\n",index_count);
@@ -972,7 +996,7 @@ int showfile_myfs(char* filename){
         sem_post(sem_data);
     }
     sem_post(mut_data);
-    
+
     sem_wait(mut_inode);
     (*inode_sem_no)--;
     if((*inode_sem_no) == 0){
@@ -984,29 +1008,29 @@ int showfile_myfs(char* filename){
 }
 
 int copy_pc2myfs(char* source,char* dest){
-    
+
     int inode_index,n;
     int i, free_inode_index = 0,free_db_index,file_size;
     FILE* fd;
     char* myfs_ = myfs;
     struct stat st;
     inode* tempInode;
-    
+
     // Get file size
     stat(source,&st);
     file_size = st.st_size;
-    printf("\n#####Copying file Name %s into MRFS #######\n", source); 
+    printf("\n#####Copying file Name %s into MRFS #######\n", source);
     // Check disk space availability
     if((ceil(((double)file_size)/vfs.sb.sb.blocksize) > vfs.sb.sb.max_disk_blocks - vfs.sb.sb.used_disk_blocks) && vfs.sb.sb.max_inodes - vfs.sb.sb.used_inodes >= 1){
         fprintf(stderr,"Insufficient disk space for data.\n");
         return -1;
     }
 
-    free_inode_index = getfreeindex(vfs.sb.mask.free_inode_bitmask,vfs.sb.mask.inode_bitmask_size); 
-    //printf("Free inode being used : %d\n",free_inode_index);  
+    free_inode_index = getfreeindex(vfs.sb.mask.free_inode_bitmask,vfs.sb.mask.inode_bitmask_size);
+    //printf("Free inode being used : %d\n",free_inode_index);
     tempInode = &vfs.inodeList[free_inode_index];
     initInode(tempInode);
-    tempInode->filetype_permission[0] = 0x01; 
+    tempInode->filetype_permission[0] = 0x01;
     fd = fopen(source,"r");
     while(feof(fd) == 0){
         free_db_index = getfreeindex(vfs.sb.mask.free_disk_bitmask,vfs.sb.mask.disk_bitmask_size);
@@ -1014,13 +1038,13 @@ int copy_pc2myfs(char* source,char* dest){
         //printf("Free DB INDEX%d\n",free_db_index);
         //printf("%s",vfs.db[free_db_index]);
         //syncdata(&vfs.sb,&vfs.db[free_db_index],free_db_index);
-        insertDataIndex(tempInode,free_db_index); 
+        insertDataIndex(tempInode,free_db_index);
         tempInode->file_size += n;
     }
     //printf("File size : %d\n",tempInode->file_size);
     insertFileInode(pwd_inode,dest,free_inode_index);
-    
-    //syncInode(&vfs.sb,tempInode,free_inode_index); 
+
+    //syncInode(&vfs.sb,tempInode,free_inode_index);
     //syncInode(&vfs.sb,&vfs.inodeList[pwd_inode],pwd_inode);
     syncSB(&vfs.sb);
     fclose(fd);
@@ -1041,7 +1065,7 @@ int copy_myfs2pc(char* source, char* dest){
     printf("\n#####Copying File Inode %d with file Name %s#######\n", fileInode,source);
     if(fileInode == -1)
         return -1;
-    
+
     sem_wait(mut_inode);
     if((*inode_sem_no) == 0){
         (*inode_sem_no)++;
@@ -1055,11 +1079,11 @@ int copy_myfs2pc(char* source, char* dest){
         sem_wait(sem_data);
     }
     sem_post(mut_data);
-    
+
     inode* inodeTemp = &vfs.inodeList[fileInode];
     int index_count = ceil(((double)inodeTemp->file_size)/vfs.sb.sb.blocksize),size;
     //printf("Max inodes to get %d\n",index_count);
-    
+
     while(index < index_count){
         //printf("<<<<<<<<<<<<<<<Showing Index %d",index);
         size = ((index == index_count - 1) ? (inodeTemp->file_size%vfs.sb.sb.blocksize) : (vfs.sb.sb.blocksize));
@@ -1093,7 +1117,7 @@ int copy_myfs2pc(char* source, char* dest){
         sem_post(sem_data);
     }
     sem_post(mut_data);
-    
+
     sem_wait(mut_inode);
     (*inode_sem_no)--;
     if((*inode_sem_no) == 0){
@@ -1119,7 +1143,7 @@ int mkdir_myfs(char* dirname){
     insertFileInode(free_inode_index,".",free_inode_index);
     insertFileInode(free_inode_index,"..",pwd_inode);
     insertFileInode(pwd_inode, dirname,free_inode_index);
-    //syncInode(&vfs.sb,tempInode,free_inode_index); 
+    //syncInode(&vfs.sb,tempInode,free_inode_index);
     //syncInode(&vfs.sb,&vfs.inodeList[pwd_inode],pwd_inode);
     syncSB(&vfs.sb);
     return 1;
@@ -1142,10 +1166,10 @@ int open_myfs(char* filename,char mode){
         return -1;
     else if(fileInode == -1 && mode == 'w'){
         printf("No file with %s name exists. Creating file.\n",filename);
-        free_inode_index = getfreeindex(vfs.sb.mask.free_inode_bitmask,vfs.sb.mask.inode_bitmask_size); 
+        free_inode_index = getfreeindex(vfs.sb.mask.free_inode_bitmask,vfs.sb.mask.inode_bitmask_size);
         tempInode = &vfs.inodeList[free_inode_index];
         initInode(tempInode);
-        tempInode->filetype_permission[0] = 0x01; 
+        tempInode->filetype_permission[0] = 0x01;
         insertFileInode(pwd_inode,filename,free_inode_index);
         fileInode = free_inode_index;
         syncSB(&vfs.sb);
@@ -1157,15 +1181,15 @@ int open_myfs(char* filename,char mode){
 
     for( i = 0; i < max_index_1; i++){
         if(vft.ft[i].offset == -1){
-            vft.ft[i].mode = (int) mode; 
+            vft.ft[i].mode = (int) mode;
             vft.ft[i].offset = 0;
             vft.ft[i].fileInode = fileInode;
             vft.max_index += 1;
-            return i;        
+            return i;
         }
     }
     vft.ft = (file_table_entry*) realloc(vft.ft,sizeof(file_table_entry)*(max_index_1 + 1));
-    vft.ft[max_index_1].mode = (int) mode; 
+    vft.ft[max_index_1].mode = (int) mode;
     vft.ft[max_index_1].offset = 0;
     vft.ft[max_index_1].fileInode = fileInode;
     vft.max_index += 1;
@@ -1198,7 +1222,7 @@ int read_myfs(int fd,int nbytes, char* buf){
     inode * inodeTemp;
     int blocksize = vfs.sb.sb.blocksize;
     int index,upper_bound = blocksize;
-    if(vft.ft[fd].mode != ((int)'r'))  
+    if(vft.ft[fd].mode != ((int)'r'))
         return -1;
 
     sem_wait(mut_inode);
@@ -1298,7 +1322,7 @@ int read_myfs(int fd,int nbytes, char* buf){
         sem_post(sem_data);
     }
     sem_post(mut_data);
-    
+
     sem_wait(mut_inode);
     (*inode_sem_no)--;
     if((*inode_sem_no) == 0){
@@ -1308,7 +1332,7 @@ int read_myfs(int fd,int nbytes, char* buf){
 
     if(base == index || base == i2)
         return bytes_read;
-   
+
     return -1;
 }
 
@@ -1322,7 +1346,7 @@ int write_myfs(int fd,int nbytes, char* buf){
     int* x;
     int blocksize = vfs.sb.sb.blocksize;
     int index,upper_bound = blocksize,bytes_to_write;
-    if(vft.ft[fd].mode != ((int)'w'))  
+    if(vft.ft[fd].mode != ((int)'w'))
         return -1;
 
     inodeTemp = &vfs.inodeList[fileInode];
@@ -1335,11 +1359,11 @@ int write_myfs(int fd,int nbytes, char* buf){
         //printf("Creating a datablock.\n");
         free_db_index = getfreeindex(vfs.sb.mask.free_disk_bitmask,vfs.sb.mask.disk_bitmask_size);
         bzero(vfs.db[free_db_index].data,blocksize);
-        insertDataIndex(inodeTemp,free_db_index); 
+        insertDataIndex(inodeTemp,free_db_index);
         if(index < i2 - 1)
             inodeTemp->file_size += blocksize;
         else
-            inodeTemp->file_size = offset + nbytes;    
+            inodeTemp->file_size = offset + nbytes;
         index++;
     }
 
@@ -1365,18 +1389,18 @@ int write_myfs(int fd,int nbytes, char* buf){
                 bcopy(point, vfs.db[dIndex].data+ offset%blocksize, blocksize - offset%blocksize );
                 point += blocksize - offset%blocksize;
                 bytes_read += blocksize - offset%blocksize;
-                offset += blocksize - offset%blocksize;                
+                offset += blocksize - offset%blocksize;
             }
         }
         else if(base < 72){
             dIndex = inodeTemp->dataList[8];
-            dIndex_1 = *((int*)(vfs.db[dIndex].data + (base-8)*4));                
+            dIndex_1 = *((int*)(vfs.db[dIndex].data + (base-8)*4));
             if(base == i2-1){
                 temp = (offset + nbytes);
                 bytes_to_write = (offset_+nbytes-offset)%blocksize;
                 bcopy(point, vfs.db[dIndex_1].data+ offset%blocksize, bytes_to_write );
                 bytes_read += bytes_to_write;
-                offset += bytes_to_write;                
+                offset += bytes_to_write;
             }
             else{
                 bcopy(point, vfs.db[dIndex_1].data+ offset%blocksize, blocksize - offset%blocksize );
@@ -1385,7 +1409,7 @@ int write_myfs(int fd,int nbytes, char* buf){
                 offset += blocksize - offset%blocksize;
             }
         }
-        else{            
+        else{
             dIndex = inodeTemp->dataList[9];
             dIndex_1 = *((int*)(vfs.db[dIndex].data + ((base-72)/64)*4));
             dIndex_2 = *((int*)(vfs.db[dIndex_1].data + ((base-72)%64)*4));
@@ -1439,7 +1463,7 @@ int restore_myfs(char* dumpfile){
     mut_super = sem_open("mut_super_2",O_CREAT|O_EXCL,S_IRWXU,1);
     sem_data = sem_open("sem_data_2",O_CREAT|O_EXCL,S_IRWXU,1);
     mut_data = sem_open("mut_data_2",O_CREAT|O_EXCL,S_IRWXU,1);
-    
+
     if((sem_inode == (void *)-1) || (mut_inode == (void *)-1) || (sem_inode == (void *)-1) || (sem_super == (void *)-1) || (mut_inode == (void *)-1) || (mut_super == (void *)-1)) {
         printf("sem_open() failed");
         exit(1);
@@ -1451,12 +1475,12 @@ int restore_myfs(char* dumpfile){
     shmid_3 = shmget(IPC_PRIVATE,4,IPC_CREAT|0700);
     if(shmid == -1)
         perror("Unable to get shared memory.\n");
-    
-    myfs = (char*)shmat(shmid,0,0); 
-    inode_sem_no = (int*)shmat(shmid_1,0,0); 
-    data_sem_no = (int*)shmat(shmid_2,0,0); 
-    super_sem_no = (int*)shmat(shmid_3,0,0); 
-    
+
+    myfs = (char*)shmat(shmid,0,0);
+    inode_sem_no = (int*)shmat(shmid_1,0,0);
+    data_sem_no = (int*)shmat(shmid_2,0,0);
+    super_sem_no = (int*)shmat(shmid_3,0,0);
+
     n = fread(myfs,st.st_size,1,fd);
 
     *inode_sem_no = 0;
@@ -1498,12 +1522,12 @@ void sync_shared_myfs(){
     mut_super = sem_open("mut_super_2",O_EXCL,S_IRWXU,1);
     sem_data = sem_open("sem_data_2",O_EXCL,S_IRWXU,1);
     mut_data = sem_open("mut_data_2",O_EXCL,S_IRWXU,1);
-    
+
     myfs = (char*)shmat(shmid,0,0);
 
-    inode_sem_no = (int*)shmat(shmid_1,0,0); 
-    data_sem_no = (int*)shmat(shmid_2,0,0); 
-    super_sem_no = (int*)shmat(shmid_3,0,0); 
+    inode_sem_no = (int*)shmat(shmid_1,0,0);
+    data_sem_no = (int*)shmat(shmid_2,0,0);
+    super_sem_no = (int*)shmat(shmid_3,0,0);
 
     vfs.sb.sb = *((superblock_*)(myfs));
     //printf("size %d\n",vfs.sb.sb.blocksize);
