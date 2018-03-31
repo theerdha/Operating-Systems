@@ -25,7 +25,7 @@ queue <int> page_FIFO;
 list <int> page_LRU;
 
 int FRAMES;
-int PAGE_FAULTS = 0;
+int PAGE_FAULTS = 0, PAGE_TRANSFER = 0, EXEC_CYCLE = 0;
 
 int freeframe()
 {
@@ -181,9 +181,11 @@ void ReadWrite(int num, char rw,int LINE_NUMBER,int algo)
 	//if((page_table[num][3] | 0xFB) == 0xFB)
 	if(aaa < 4)
 	{
+		PAGE_FAULTS ++;	
 		int phy = freeframe();
 		if(phy != -1)
 		{
+			EXEC_CYCLE ++;
 			cout << LINE_NUMBER << ": "<< "Load frame " <<  phy << " in page "<< num << endl;
 			cout << LINE_NUMBER << ": "<<"access memory" << endl;
 			freeList[phy] = 0;
@@ -192,12 +194,14 @@ void ReadWrite(int num, char rw,int LINE_NUMBER,int algo)
 		else
 		{
 			// Victim page selection algorithm returns vir,phy
+			PAGE_TRANSFER ++;
 			int vir;
 			if(algo == 1)vir = FIFO(&phy);
 			else if(algo == 2)vir = RandomPR(&phy);
 			else if(algo == 3)vir = LRU(&phy);
 			else if(algo == 4)vir = NRU(&phy);
 			else vir = SecChance(&phy);
+			EXEC_CYCLE += 3501;
 			cout << LINE_NUMBER << ": "<<"UNMAP " << vir  << " "<< phy << endl;
 
 			int * bb;
@@ -207,7 +211,11 @@ void ReadWrite(int num, char rw,int LINE_NUMBER,int algo)
 			bbb %= 4;
 
 			//if((page_table[vir][3] | 0xFD) == 0xFF) cout << "OUT" << vir  << " "<< phy <<endl;
-			if(bbb >= 2) cout << LINE_NUMBER << ": "<<"OUT " << vir  << " "<< phy <<endl;
+			if(bbb >= 2)
+			{
+				cout << LINE_NUMBER << ": "<<"OUT " << vir  << " "<< phy <<endl;
+				EXEC_CYCLE += 3000;	
+			} 
 			cout << LINE_NUMBER << ": "<< "IN " << num  << " "<< phy <<endl;
 			cout << LINE_NUMBER << ": "<< "MAP " << num  << " "<< phy <<endl;
 			cout << LINE_NUMBER << ": "<< "access memory" << endl;
@@ -229,8 +237,8 @@ void ReadWrite(int num, char rw,int LINE_NUMBER,int algo)
 	}
 	else
 	{
+		EXEC_CYCLE ++;
 		cout <<LINE_NUMBER << ": "<< "access memory" << endl;
-		PAGE_FAULTS ++;	
 	} 
 	
 	if(rw == '1')
@@ -302,7 +310,7 @@ void Initialize()
         page_LRU.pop_back();
     }
 
-	PAGE_FAULTS = 0;
+	PAGE_FAULTS = 0;PAGE_TRANSFER = 0; EXEC_CYCLE = 0;
 	for(int i = 0; i < FRAMES; i++)
 	{
 		freeList.push_back(1);
@@ -327,22 +335,27 @@ int main()
 	Initialize();
 	cout << endl << "FIFO PR" << endl;
 	for(int i = 0; i < IR_TABLE.size(); i++) ReadWrite(IR_TABLE[i].page,IR_TABLE[i].rw,IR_TABLE[i].line_no,1);
+	cout << "PAGE FAULTS = " << PAGE_FAULTS << " PAGE TRANSFERs = " << PAGE_TRANSFER << " EXEC CYCLES = " << EXEC_CYCLE << endl;
 
 	Initialize();
 	cout << endl << "Ranndom PR" << endl;
 	for(int i = 0; i < IR_TABLE.size(); i++) ReadWrite(IR_TABLE[i].page,IR_TABLE[i].rw,IR_TABLE[i].line_no,2);
+	cout << "PAGE FAULTS = " << PAGE_FAULTS << " PAGE TRANSFERs = " << PAGE_TRANSFER << " EXEC CYCLES = " << EXEC_CYCLE << endl;
 
 	Initialize();
 	cout << endl << "LRU PR" << endl;
 	for(int i = 0; i < IR_TABLE.size(); i++) ReadWrite(IR_TABLE[i].page,IR_TABLE[i].rw,IR_TABLE[i].line_no,3);
+	cout << "PAGE FAULTS = " << PAGE_FAULTS << " PAGE TRANSFERs = " << PAGE_TRANSFER << " EXEC CYCLES = " << EXEC_CYCLE << endl;
 
 	Initialize();
 	cout << endl << "NRU PR" << endl;
 	for(int i = 0; i < IR_TABLE.size(); i++) ReadWrite(IR_TABLE[i].page,IR_TABLE[i].rw,IR_TABLE[i].line_no,4);
+	cout << "PAGE FAULTS = " << PAGE_FAULTS << " PAGE TRANSFERs = " << PAGE_TRANSFER << " EXEC CYCLES = " << EXEC_CYCLE << endl;
 
 	Initialize();
 	cout << endl << "second chance PR" << endl;
 	for(int i = 0; i < IR_TABLE.size(); i++) ReadWrite(IR_TABLE[i].page,IR_TABLE[i].rw,IR_TABLE[i].line_no,5);
+	cout << "PAGE FAULTS = " << PAGE_FAULTS << " PAGE TRANSFERs = " << PAGE_TRANSFER << " EXEC CYCLES = " << EXEC_CYCLE << endl;
 	
 	return 0;	
 }
