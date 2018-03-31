@@ -10,6 +10,14 @@
 
 using namespace std;
 
+typedef struct INSTR
+{
+	int line_no;
+	int page;
+	char rw;
+}instruction; 
+
+vector<instruction> IR_TABLE;
 char page_table[64][4];
 vector<int> freeList; //--> 1 : free , 0 : occupied
 vector<int> frameLine; //--> -1 : free , else line number at which it is loaded
@@ -17,7 +25,6 @@ queue <int> page_FIFO;
 list <int> page_LRU;
 
 int FRAMES;
-int LINE_NUMBER = 0;
 int PAGE_FAULTS = 0;
 
 int freeframe()
@@ -31,16 +38,16 @@ int freeframe()
 
 int RandomPR(int * phy)
 {
-	int vir,b1;
+	int vir,b1,b2;
 	int *x1;
 	while(1)
 	{
 		vir = rand() % 64;
 		x1 = (int *)(page_table[vir]);
 		b1 = *x1;
-		b1 %= 8;
+		b2 = b1 % 8;
 		// if((page_table[vir][3] | 0xFB) == 0xFF) break;
-		if(b1 >= 4) break;
+	    if(b2 >= 4) break;
 	}
 	*phy = b1/8;
 	return vir;
@@ -127,10 +134,7 @@ int FIFO(int * phy)
 	b1 = *x1;
 	int b3 = b1/8;
 	int b2 = b1 % 8;
-	if(b2 >= 4)
-	{
-		*phy = b3;
-	}
+	*phy = b3;
 	
 	return vir;
 }
@@ -150,6 +154,7 @@ int SecChance(int * phy)
 		{
 			vir = x;
 			*phy = b1/8;
+			page_FIFO.pop();
 			break;	
 		}
 		else
@@ -157,13 +162,14 @@ int SecChance(int * phy)
 			b1 -= 1;
 			*x1 = b1;
 			page_FIFO.push(page_FIFO.front());
+			page_FIFO.pop();
 		} 
-		page_FIFO.pop();
+		
 	}
 	return vir;
 }
 
-void ReadWrite(int num, char rw)
+void ReadWrite(int num, char rw,int LINE_NUMBER,int algo)
 {
 	//page table entry is not valid(valid == 0)
 	int * aa;
@@ -178,7 +184,7 @@ void ReadWrite(int num, char rw)
 		int phy = freeframe();
 		if(phy != -1)
 		{
-			cout << LINE_NUMBER << ": "<< "Load page " <<  phy << endl;
+			cout << LINE_NUMBER << ": "<< "Load frame " <<  phy << " in page "<< num << endl;
 			cout << LINE_NUMBER << ": "<<"access memory" << endl;
 			freeList[phy] = 0;
 		}
@@ -186,7 +192,12 @@ void ReadWrite(int num, char rw)
 		else
 		{
 			// Victim page selection algorithm returns vir,phy
-			int vir = LRU(&phy);
+			int vir;
+			if(algo == 1)vir = FIFO(&phy);
+			else if(algo == 2)vir = RandomPR(&phy);
+			else if(algo == 3)vir = LRU(&phy);
+			else if(algo == 4)vir = NRU(&phy);
+			else vir = SecChance(&phy);
 			cout << LINE_NUMBER << ": "<<"UNMAP " << vir  << " "<< phy << endl;
 
 			int * bb;
@@ -204,10 +215,12 @@ void ReadWrite(int num, char rw)
 		
 		//////copy the physical frame number into pagetable
 		int *x;
-		int b;
+		int b,c;
 		x = (int *)(page_table[num]);
 		b = *x;
-		int c = 8 * phy + (b % 8) + 4;
+		if((b % 8) < 4) c = 8 * phy + (b % 8) + 4;
+		else c = 8 * phy + (b % 8);
+		//cout << "c " << c << endl;
 		//frameLine[phy] = LINE_NUMBER;
 		page_FIFO.push(num);
 		*x = c; 
@@ -220,13 +233,13 @@ void ReadWrite(int num, char rw)
 		PAGE_FAULTS ++;	
 	} 
 	
-	if(rw == 1)
+	if(rw == '1')
 	{
 		int *x1;
 		int b1;
 		x1 = (int *)(page_table[num]);
 		b1 = *x1;
-		b1 = b1 + 2; 
+		if((b1 % 4 ) < 2)b1 = b1 + 2; 
 		*x1 = b1;
 		//page_table[num][3] |= 0x02; // dirty bit is set one
 	}
@@ -235,7 +248,7 @@ void ReadWrite(int num, char rw)
 	int b2;
 	x2 = (int *)(page_table[num]);
 	b2 = *x2;
-	b2 = b2 + 1; 
+	if((b2 % 2) < 1)b2 = b2 + 1; 
 	*x2 = b2;
 
 	page_LRU.remove(num);
@@ -248,6 +261,7 @@ void ReadWrite(int num, char rw)
 void parse_page()
 {
 	string line;
+	int LINE_NUMBER = 0;
 	ifstream myfile ("example.txt");
 	if (myfile.is_open())
 	{
@@ -257,12 +271,16 @@ void parse_page()
 			if(line[0] == '#')continue;
 			else 
 			{
+				instruction a;
 				string r = line.substr(2,2);
 				stringstream s(r);
 				int page_number;
 				s >> page_number;
-				
-				ReadWrite(page_number,line[0]);
+				a.page = page_number;
+				a.rw = line[0];
+				a.line_no = LINE_NUMBER;
+				IR_TABLE.push_back(a);
+				//ReadWrite(page_number,line[0]);
 			}
 		}
 		myfile.close();
@@ -270,22 +288,61 @@ void parse_page()
 	return;
 }
 
-int main()
+void Initialize()
 {
-	cin >> FRAMES;
-	 srand (time(NULL));
-	//Initializing freelist to be all available
+
+	freeList.clear(); //--> 1 : free , 0 : occupied
+	frameLine.clear(); //--> -1 : free , else line number at which it is loaded
+	while (!page_FIFO.empty())
+    {
+        page_FIFO.pop();
+    }
+    while (!page_LRU.empty())
+    {
+        page_LRU.pop_back();
+    }
+
+	PAGE_FAULTS = 0;
 	for(int i = 0; i < FRAMES; i++)
 	{
 		freeList.push_back(1);
 		frameLine.push_back(-1);
 	}
+
+	int * x;
 	//Initializing valid,dirty and reference bits to be 0
 	for(int i = 0 ; i < 64; i++)
 	{
-		page_table[i][3] &= 0x00;
-
+		x = (int *)page_table[i];
+		*x = 0;
 	}
+}
+
+int main()
+{
+	cin >> FRAMES;
+	srand (time(NULL));
 	parse_page();
+
+	Initialize();
+	cout << endl << "FIFO PR" << endl;
+	for(int i = 0; i < IR_TABLE.size(); i++) ReadWrite(IR_TABLE[i].page,IR_TABLE[i].rw,IR_TABLE[i].line_no,1);
+
+	Initialize();
+	cout << endl << "Ranndom PR" << endl;
+	for(int i = 0; i < IR_TABLE.size(); i++) ReadWrite(IR_TABLE[i].page,IR_TABLE[i].rw,IR_TABLE[i].line_no,2);
+
+	Initialize();
+	cout << endl << "LRU PR" << endl;
+	for(int i = 0; i < IR_TABLE.size(); i++) ReadWrite(IR_TABLE[i].page,IR_TABLE[i].rw,IR_TABLE[i].line_no,3);
+
+	Initialize();
+	cout << endl << "NRU PR" << endl;
+	for(int i = 0; i < IR_TABLE.size(); i++) ReadWrite(IR_TABLE[i].page,IR_TABLE[i].rw,IR_TABLE[i].line_no,4);
+
+	Initialize();
+	cout << endl << "second chance PR" << endl;
+	for(int i = 0; i < IR_TABLE.size(); i++) ReadWrite(IR_TABLE[i].page,IR_TABLE[i].rw,IR_TABLE[i].line_no,5);
+	
 	return 0;	
 }
