@@ -158,6 +158,7 @@ void ReadWrite(int num, char rw,int LINE_NUMBER,int algo)
 			else vir = SecChance(&phy);
 			EXEC_CYCLE += 3501;
 			cout << LINE_NUMBER << ": "<<"UNMAP " << vir  << " "<< phy << endl;
+			page_table[vir] -= 4;
 
 			if(page_table[vir] % 4 >= 2) //if dirty
 			{
@@ -255,31 +256,30 @@ int main()
 	cin >> FRAMES;
 	srand (time(NULL));
 	parse_page();
+	int count  = 1;
 
-	Initialize();
-	cout << endl << "FIFO PR" << endl;
-	for(int i = 0; i < IR_TABLE.size(); i++) ReadWrite(IR_TABLE[i].page,IR_TABLE[i].rw,IR_TABLE[i].line_no,1);
-	cout << "PAGE FAULTS = " << PAGE_FAULTS << " PAGE TRANSFERs = " << PAGE_TRANSFER << " EXEC CYCLES = " << EXEC_CYCLE << endl;
 
-	Initialize();
-	cout << endl << "Ranndom PR" << endl;
-	for(int i = 0; i < IR_TABLE.size(); i++) ReadWrite(IR_TABLE[i].page,IR_TABLE[i].rw,IR_TABLE[i].line_no,2);
-	cout << "PAGE FAULTS = " << PAGE_FAULTS << " PAGE TRANSFERs = " << PAGE_TRANSFER << " EXEC CYCLES = " << EXEC_CYCLE << endl;
-
-	Initialize();
-	cout << endl << "LRU PR" << endl;
-	for(int i = 0; i < IR_TABLE.size(); i++) ReadWrite(IR_TABLE[i].page,IR_TABLE[i].rw,IR_TABLE[i].line_no,3);
-	cout << "PAGE FAULTS = " << PAGE_FAULTS << " PAGE TRANSFERs = " << PAGE_TRANSFER << " EXEC CYCLES = " << EXEC_CYCLE << endl;
-
-	Initialize();
-	cout << endl << "NRU PR" << endl;
-	for(int i = 0; i < IR_TABLE.size(); i++) ReadWrite(IR_TABLE[i].page,IR_TABLE[i].rw,IR_TABLE[i].line_no,4);
-	cout << "PAGE FAULTS = " << PAGE_FAULTS << " PAGE TRANSFERs = " << PAGE_TRANSFER << " EXEC CYCLES = " << EXEC_CYCLE << endl;
-
-	Initialize();
-	cout << endl << "second chance PR" << endl;
-	for(int i = 0; i < IR_TABLE.size(); i++) ReadWrite(IR_TABLE[i].page,IR_TABLE[i].rw,IR_TABLE[i].line_no,5);
-	cout << "PAGE FAULTS = " << PAGE_FAULTS << " PAGE TRANSFERs = " << PAGE_TRANSFER << " EXEC CYCLES = " << EXEC_CYCLE << endl;
+	while(count <= 5)
+	{
+		Initialize();
+		if(count == 1)cout << endl << "FIFO PR" << endl;
+		else if(count == 2) cout << endl << "Ranndom PR" << endl;
+		else if(count == 3) cout << endl << "LRU PR" << endl;
+		else if(count == 4) cout << endl << "NRU PR" << endl;
+		else cout << endl << "second chance PR" << endl;
+		for(int i = 0; i < IR_TABLE.size(); i++)
+		{
+			ReadWrite(IR_TABLE[i].page,IR_TABLE[i].rw,IR_TABLE[i].line_no,count);
+			cout << "valid pages are : ";
+			for(int j = 0; j < 64; j++)
+			{
+				if( (page_table[j] % 8) >= 4) cout << j << " ";
+			}	
+			cout << endl;
+		} 
+		cout << "PAGE FAULTS = " << PAGE_FAULTS << " PAGE TRANSFERs = " << PAGE_TRANSFER << " EXEC CYCLES = " << EXEC_CYCLE << endl;
+		count ++;	
+	}
 	
 	return 0;	
 }
