@@ -134,14 +134,15 @@ int SecChance(int * phy)
 void ReadWrite(int num, char rw,int LINE_NUMBER,int algo)
 {
 	//page table entry is not valid(valid == 0)
+	
 	if((page_table[num] % 8) < 4)
 	{
 		PAGE_FAULTS ++;	
 		int phy = freeframe();
 		if(phy != -1)
 		{
-			EXEC_CYCLE ++;
-			cout << LINE_NUMBER << ": "<< "Load frame " <<  phy << " in page "<< num << endl;
+			cout << LINE_NUMBER << ": "<< "MAP " <<  num << " "<< phy << endl;
+			EXEC_CYCLE += 251;
 			cout << LINE_NUMBER << ": "<<"access memory" << endl;
 			freeList[phy] = 0;
 		}
@@ -251,35 +252,75 @@ void Initialize()
 	}
 }
 
+void data_gen(int page_refs,int work_set,float prob_loc_ref, float prob_r)
+{
+	ofstream myfile;
+	myfile.open ("example.txt");
+	vector<int> recent_5(work_set);
+	float r;
+	int rw;
+	int page,index;
+	for(int i = 0 ; i < work_set; i++)
+	{
+		recent_5[i] = rand() % 64;
+		r = static_cast <float> (rand()) / static_cast <float> (RAND_MAX);
+		if(r <= prob_r) rw = 0; else rw = 1;
+		myfile << rw << " " << recent_5[i] << endl;
+	}
+
+	for(int i = work_set; i < page_refs; i++)
+	{
+		r = static_cast <float> (rand()) / static_cast <float> (RAND_MAX);
+		if(r <= prob_loc_ref)
+		{
+			index = rand() % work_set;
+			page = recent_5[index];	
+		}
+		else
+		{
+			page = rand() % 64;
+		}
+		r = static_cast <float> (rand()) / static_cast <float> (RAND_MAX);
+		if(r <= prob_r) rw = 0; else rw = 1;
+		recent_5[i % work_set] = page;
+		myfile << rw << " " << page << endl;
+	}
+	myfile.close();
+	return;
+
+}
+
 int main()
 {
 	cin >> FRAMES;
 	srand (time(NULL));
-	parse_page();
+	data_gen(500,10,0.7,0.6);
+	//parse_page();
+
 	int count  = 1;
 
 
-	while(count <= 5)
-	{
-		Initialize();
-		if(count == 1)cout << endl << "FIFO PR" << endl;
-		else if(count == 2) cout << endl << "Ranndom PR" << endl;
-		else if(count == 3) cout << endl << "LRU PR" << endl;
-		else if(count == 4) cout << endl << "NRU PR" << endl;
-		else cout << endl << "second chance PR" << endl;
-		for(int i = 0; i < IR_TABLE.size(); i++)
-		{
-			ReadWrite(IR_TABLE[i].page,IR_TABLE[i].rw,IR_TABLE[i].line_no,count);
-			cout << "valid pages are : ";
-			for(int j = 0; j < 64; j++)
-			{
-				if( (page_table[j] % 8) >= 4) cout << j << " ";
-			}	
-			cout << endl;
-		} 
-		cout << "PAGE FAULTS = " << PAGE_FAULTS << " PAGE TRANSFERs = " << PAGE_TRANSFER << " EXEC CYCLES = " << EXEC_CYCLE << endl;
-		count ++;	
-	}
+	// while(count <= 5)
+	// {
+	// 	Initialize();
+	// 	if(count == 1)cout << endl << "FIFO PR" << endl;
+	// 	else if(count == 2) cout << endl << "Ranndom PR" << endl;
+	// 	else if(count == 3) cout << endl << "LRU PR" << endl;
+	// 	else if(count == 4) cout << endl << "NRU PR" << endl;
+	// 	else cout << endl << "second chance PR" << endl;
+	// 	for(int i = 0; i < IR_TABLE.size(); i++)
+	// 	{
+	// 		ReadWrite(IR_TABLE[i].page,IR_TABLE[i].rw,IR_TABLE[i].line_no,count);
+	// 		cout << "valid pages are : ";
+	// 		for(int j = 0; j < 64; j++)
+	// 		{
+	// 			if( (page_table[j] % 8) >= 4) cout << j << " ";
+	// 		}	
+	// 		cout << endl;
+	// 	} 
+	// 	cout << "PAGE FAULTS = " << PAGE_FAULTS << " PAGE TRANSFERs = " << PAGE_TRANSFER << " EXEC CYCLES = " << EXEC_CYCLE << endl;
+	// 	count ++;	
+	// }
 	
 	return 0;	
 }
